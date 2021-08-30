@@ -5,10 +5,10 @@ with ocamlPackages;
 let pname = "mrdt";
 
     repo = fetchFromGitHub {
-      owner = "anmolsahoo25";
+      owner = "cuplv";
       repo = "ocaml-mrdt-v2";
-      rev = "6fc4f73d55eee3623238ebcb8df4ec6a997d78a4";
-      sha256 = "1fr7gsm5zid8s7s9ffzg3mw9mzcwaxxbi3n12f069c0sgnancdg9";
+      rev = "1f4e36c0a5fa324787a71da3827d47968f0249f5";
+      sha256 = "1jzn13xmiwazbc4qmw7vwcjw7rf40p2r51jzmnznp9awin4rblb3";
     };
 
 in
@@ -22,6 +22,5 @@ buildDunePackage rec {
     ocaml-scylla
     irmin
     ppx_irmin
-    # unix
   ];
 }

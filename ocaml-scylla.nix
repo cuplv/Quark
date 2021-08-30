@@ -24,7 +24,6 @@ buildDunePackage rec {
     uutf
     ppxlib
     ppx_deriving
-    # unix
   ];
   propagatedBuildInputs = [
     faraday

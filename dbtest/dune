@@ -1,0 +1,4 @@
+(executable
+  (name dbtest)
+  (libraries mrdt scylla)
+  (preprocess (pps ppx_irmin)))

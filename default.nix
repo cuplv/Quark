@@ -5,4 +5,7 @@ rec {
   ocaml-mrdt = callPackage ./ocaml-mrdt.nix {
     inherit ocaml-scylla;
   };
+  dbtest = callPackage ./dbtest.nix {
+    inherit ocaml-scylla ocaml-mrdt;
+  };
 }
