@@ -13,9 +13,9 @@ buildDunePackage rec {
   useDune2 = true;
   buildInputs = [
     ocaml-scylla
-    ocaml-mrdt
-    irmin
-    ppx_irmin
+    # ocaml-mrdt
+    # irmin
+    # ppx_irmin
     # unix
   ];
 }

@@ -19,13 +19,13 @@ buildDunePackage rec {
   src = repo;
   useDune2 = true;
   buildInputs = [
-    angstrom
-    lwt
-    uutf
-    ppxlib
-    ppx_deriving
   ];
   propagatedBuildInputs = [
+    angstrom
     faraday
+    lwt
+    ppx_deriving
+    ppxlib
+    uutf
   ];
 }
