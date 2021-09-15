@@ -13,37 +13,22 @@ $ docker logs some-scylla | tail
 
 [Official guide to running Scylla in Docker](https://docs.scylladb.com/operating-scylla/procedures/tips/best_practices_scylla_on_docker/)
 
-Next, create the "mrdt" keyspace, so that tables can be added for new mrdt stores.
-This can be accomplished using `csqlsh`, which can be found in the `cassandra` package on NixOS.
-
-```
-$ nix run nixpkgs.cassandra -c cqlsh
-Connected to  at 127.0.0.1:9042
-...
-...
-cqlsh> CREATE KEYSPACE mrdt
-   ... WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1 };
-```
-
-Finally, run the `dbtest` program.
-This uses an experimental ocaml + scylla + irmin interface, found in these two repos:
+Next, run the `dbtest` program.
+This uses the ocaml-scylla library to query the scylla docker container
+The library is packaged for use in `nix-shell` by the `ocaml-scylla.nix` file.
 
 [ocaml-scylla](https://github.com/anmolsahoo25/ocaml-scylla)
 
-[ocaml-mrdt](https://github.com/cuplv/ocaml-mrdt-v2)
-
-These are packaged for use in `nix-shell` by the `ocaml-scylla.nix` and `ocaml-mrdt.nix` files.
+Currently, the `dbtest` program creates a content-addressed store, stores two items (string values) in it, and retrieves them.
 
 ```
 $ nix-shell
 (nix-shell) $ cd dbtest
 (nix-shell) $ dune build
 (nix-shell) $ _build/default/dbtest.exe
-R0 added element 5.
-R0 says min element is 5.
-R1 added element 7.
-R1 says min element is 7.
-After merge, R1 says min element is 5.
+Opened connection.
+Created store.
+Stored items.
+Found "Earth".
+Found "Moon".
 ```
-
-This creates two database replicas, and merges their values.
