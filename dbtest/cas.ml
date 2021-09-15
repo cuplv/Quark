@@ -1,6 +1,8 @@
 open Scylla
 open Scylla.Protocol
 
+open Util
+
 let ks_query = Printf.sprintf
   "create keyspace if not exists cas
    with replication = {
@@ -32,18 +34,12 @@ module type DATA = sig
   val from_big : Bigstringaf.t -> t
 end
 
-let big_of_string s = Bigstringaf.of_string s ~off:0 ~len:(String.length s)
-
 module StrData : DATA with type t = string = struct
   type t = string
   let hash s = Digest.string s
   let to_big = big_of_string
   let from_big = Bigstringaf.to_string
 end
-
-let get_value v =
-  let v = (function Blob b -> b | _ -> failwith "error") v in
-  v
 
 module Store (Data : DATA) = struct
   type t = { store_name : string; connection : conn }

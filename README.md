@@ -19,16 +19,29 @@ The library is packaged for use in `nix-shell` by the `ocaml-scylla.nix` file.
 
 [ocaml-scylla](https://github.com/anmolsahoo25/ocaml-scylla)
 
-Currently, the `dbtest` program creates a content-addressed store, stores two items (string values) in it, and retrieves them.
+Currently, the `dbtest` program creates a content-addressed store and branch-tracking store, assigns several value versions to the branches, and merges the changes between them using fast-forward and 3-way merge.
 
 ```
 $ nix-shell
 (nix-shell) $ cd dbtest
 (nix-shell) $ dune build
 (nix-shell) $ _build/default/dbtest.exe
+Opening connection...
 Opened connection.
-Created store.
-Stored items.
-Found "Earth".
-Found "Moon".
+Created store tables.
+Updated/created branch b1 with value "Hello".
+Forked new branch b2 off of b1.
+Updated/created branch b2 with value "Hello Earth".
+Updated/created branch b1 with value "Hello Moon".
+Pulled from b1 into b2 to get "Hello Moon Earth".
+Updated/created branch b1 with value "Hello Moon, Mars".
+Pulled from b2 into b1 to get "Hello Moon Earth, Mars".
+Pulled from b1 into b2 to get "Hello Moon Earth, Mars".
+Updated/created branch b1 with value "Hello Moon Earth, Mars, etc.".
+Pulled from b1 into b2 to get "Hello Moon Earth, Mars, etc.".
 ```
+
+The bottom of the `dbtest.ml` file is the script of forks, updates, and pulls that produces the above behavior.
+This file also contains the simple string merge function used, `str_merge`.
+
+[dbtest.ml](./dbtest/dbtest.ml)
