@@ -27,6 +27,8 @@ let select_query s = Printf.sprintf
   "select value from cas.%s where key = ?"
   s
 
+type content_id = Digest.t
+
 module type DATA = sig
   type t
   val hash : t -> Digest.t
@@ -69,5 +71,5 @@ module Store (Data : DATA) = struct
               ~values:[|kb|]
               ()
     in
-    Result.map (fun v -> Data.from_big (get_value v.values.(0).(0))) r
+    Result.map (fun v -> Data.from_big (get_blob v.values.(0).(0))) r
 end

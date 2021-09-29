@@ -1,6 +1,8 @@
 module Store = Cas.Store (Cas.StrData)
 module BS = BStore.Store
+module VS = Version.Graph
 
+open Version
 
 let earth : Cas.StrData.t = "Earth"
 
@@ -22,6 +24,11 @@ let bs =
   | Ok s -> s
   | Error e -> let () = Printf.printf "%s" e in exit 1
 
+let vs =
+  match VS.init "store2" conn with
+  | Ok s -> s
+  | Error e -> let () = Printf.printf "%s" e in exit 1
+
 let () = Printf.printf "Created store tables.\n"
 
 let store = Store.store cs
@@ -37,6 +44,7 @@ let str_merge lca v1 v2 =
   Result.bind (find lca) (fun lca_s ->
   Result.bind (find v1)  (fun v1_s ->
   Result.bind (find v2)  (fun v2_s ->
+  let _ = Printf.printf "Merging strings.\n" in
   let l = String.length lca_s in
   let d1 = String.sub v1_s l (String.length v1_s - l) in
   let d2 = String.sub v2_s l (String.length v2_s - l) in
@@ -44,18 +52,28 @@ let str_merge lca v1 v2 =
   Ok hash )))
 
 let latest b =
-  Result.bind (BS.get_latest bs b) (fun k ->
-  Result.bind (find k)             (fun v ->
+  Result.bind (BS.get_head bs b)  (fun k ->
+  Result.bind (find k.content_id) (fun v ->
   Ok v ))
 
 let update b s =
   let k = store s in
-  let r = BS.update_branch bs b k in
-  let () = Printf.printf "Updated/created branch %s with value \"%s\".\n"
-             b
-             (latest b |> Result.get_ok)
-  in
-  r
+  let o = BS.get_head_opt bs b |> Result.get_ok in
+  match o with
+  | Some h -> 
+      let r = BS.update_head bs (bump_version h k) in
+      let () = Printf.printf "Updated branch %s with value \"%s\".\n"
+                 b
+                 (latest b |> Result.get_ok)
+      in
+      r
+  | None ->
+     let r = BS.update_head bs (init_version b k) in
+     let () = Printf.printf "Created branch %s with value \"%s\".\n"
+                b
+                (latest b |> Result.get_ok)
+     in
+     r
 
 let fork b1 b2 =
   let r = BS.fork bs b1 b2 in
@@ -71,9 +89,12 @@ let pull from_b into_b =
   in
   r
 
-let b1 = update "b1" "Hello" |> Result.get_ok
+let b1 = "b1"
+let b2 = "b2"
 
-let b2 = fork b1 "b2" |> Result.get_ok
+let _ = update b1 "Hello" |> Result.get_ok
+
+let _ = fork b1 b2 |> Result.get_ok
 
 let _ = update b2 "Hello Earth"
 

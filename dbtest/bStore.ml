@@ -3,6 +3,8 @@ open Scylla.Protocol
 
 open Util
 
+open Version
+
 let ks_query = Printf.sprintf
   "create keyspace if not exists bstore
    with replication = {
@@ -10,50 +12,66 @@ let ks_query = Printf.sprintf
    'replication_factor':1};"
 
 let create_bstore_query s = Printf.sprintf
-  "create table if not exists bstore.%s_branches(
-   name blob,
-   latest blob,
-   primary key (name))"
+  "create table if not exists bstore.%s_head(
+     branch blob,
+     version_num int,
+     content_id blob,
+     primary key (branch))"
   s
 
 let create_lcastore_query s = Printf.sprintf
-  "create table if not exists bstore.%s_lcas(
-   key blob,
-   lca blob,
-   primary key (key))"
+  "create table if not exists bstore.%s_lca(
+     branch1 blob,
+     branch2 blob,
+     lca_branch blob,
+     lca_version_num int,
+     lca_content_id blob,
+     primary key (
+       branch1,
+       branch2))"
   s
 
 let list_query s = Printf.sprintf
-  "select name from bstore.%s_branches"
+  "select branch from bstore.%s_head"
   s
 
 (* INSERT updates a row if the primary keys match *)
 let upsert_branch_query s = Printf.sprintf
-  "insert into bstore.%s_branches(
-   name,
-   latest)
-   VALUES (?,?)"
+  "insert into bstore.%s_head(
+     branch,
+     version_num,
+     content_id)
+   VALUES (?,?,?)"
   s
 
-let get_latest_query s = Printf.sprintf
-  "select latest from bstore.%s_branches where name = ?"
+let get_head_query s = Printf.sprintf
+  "select branch, version_num, content_id
+   from bstore.%s_head
+   where branch = ?"
   s
 
 let upsert_lca_query s = Printf.sprintf
-  "insert into bstore.%s_lcas(
-   key,
-   lca)
-   VALUES (?,?)"
+  "insert into bstore.%s_lca(
+     branch1,
+     branch2,
+     lca_branch,
+     lca_version_num,
+     lca_content_id)
+   VALUES (?,?,?,?,?)"
   s
 
 let get_lca_query s = Printf.sprintf
-  "select lca from bstore.%s_lcas where key = ?"
+  "select lca_branch, lca_version_num, lca_content_id from bstore.%s_lca
+   where branch1 = ? and branch2 = ?"
   s
 
 type branch = string
 
 let get_branch_name v =
-  Bigstringaf.to_string (get_value v.(0))
+  Bigstringaf.to_string (get_blob v.(0))
+
+let order_branches : branch -> branch -> branch * branch =
+  fun b1 b2 -> if b1 > b2 then (b1,b2) else (b2,b1)
 
 let branch_pair_key b1 b2 =
   let (h1,h2) = if b1 < b2
@@ -62,16 +80,21 @@ let branch_pair_key b1 b2 =
   Digest.string (h1 ^ h2)
 
 module Store = struct
-  type t = { store_name : string; connection : conn }
+  type t =
+    { store_name : string;
+      connection : conn;
+      version_graph : Version.Graph.t
+    }
   let init s conn =
-    let r1 = query conn ~query:ks_query () in
-    let r2 = Result.bind r1
-               (fun _ -> query conn ~query:(create_bstore_query s) ())
-    in
-    let r3 = Result.bind r2
-               (fun _ -> query conn ~query:(create_lcastore_query s) ())
-    in
-    Result.map (fun _ -> {store_name = s; connection = conn}) r3
+    let* _ = query conn ~query:ks_query () in
+    let* graph = Version.Graph.init s conn in
+    let* _ = query conn ~query:(create_bstore_query s) () in
+    let* _ = query conn ~query:(create_lcastore_query s) () in
+    Ok
+      { store_name = s;
+        connection = conn;
+        version_graph = graph
+      }
   let list_branches t =
     let r = query
               t.connection
@@ -80,78 +103,127 @@ module Store = struct
           |> Result.get_ok
     in
     Array.map get_branch_name r.values
-  let update_branch t n v =
-    let nb = Blob (big_of_string n) in
-    let vb = Blob (big_of_string v) in
-    let r = query
-              t.connection
-              ~query:(upsert_branch_query t.store_name)
-              ~values:[|nb;vb|]
-              ()
+  let update_head : t -> Version.version -> (unit, string) result =
+    fun t v ->
+    let* _ = query
+               t.connection
+               ~query:(upsert_branch_query t.store_name)
+               ~values:[|
+                 Blob (big_of_string v.branch);
+                 Int (Int32.of_int v.version_num);
+                 Blob (big_of_string v.content_id);
+               |]
+               ()
     in
-    Result.map (fun _ -> n) r
-  let get_latest : t -> branch -> (string, string) result = fun t n ->
-    let nb = Blob (big_of_string n) in
-    let r = query
-              t.connection
-              ~query:(get_latest_query t.store_name)
-              ~values:[|nb|]
-              ()
+    Ok ()
+  let get_head_opt : t -> branch -> (version option, string) result =
+    fun t b ->
+    let* r = query
+               t.connection
+               ~query:(get_head_query t.store_name)
+               ~values:[| Blob (big_of_string b) |]
+               ()
     in
-    Result.map (fun v -> Bigstringaf.to_string (get_value v.values.(0).(0))) r
-  let update_lca : t -> branch -> branch -> string -> (unit, string) result
-    = fun t n1 n2 v ->
-    let kb = Blob (big_of_string (branch_pair_key n1 n2)) in
-    let vb = Blob (big_of_string v) in
-    let r = query
-              t.connection
-              ~query:(upsert_lca_query t.store_name)
-              ~values:[|kb;vb|]
-              ()
+    if Array.length r.values > 0
+    then Ok (Some (version_from_row r.values.(0)))
+    else Ok None
+  let get_head : t -> branch -> (version, string) result =
+    fun t b ->
+    let* o = get_head_opt t b in
+    Ok (Option.get o)
+  let update_lca : t -> branch -> branch -> version -> (unit, string) result
+    = fun t n1 n2 lca ->
+    let (b1,b2) = order_branches n1 n2 in
+    let* _ = query
+               t.connection
+               ~query:(upsert_lca_query t.store_name)
+               ~values:[|
+                 (* Branches *)
+                 Blob (big_of_string b1);
+                 Blob (big_of_string b2);
+                 (* LCA version *)
+                 Blob (big_of_string lca.branch);
+                 Int (Int32.of_int lca.version_num);
+                 Blob (big_of_string lca.content_id)
+               |]
+               ()
     in
-    Result.map (fun _ -> ()) r
-  let get_lca : t -> branch -> branch -> (string, string) result
+    Ok ()
+  let get_lca : t -> branch -> branch -> (version, string) result
     = fun t n1 n2 ->
-    let kb = Blob (big_of_string (branch_pair_key n1 n2)) in
-    let r = query
-              t.connection
-              ~query:(get_lca_query t.store_name)
-              ~values:[|kb|]
-              ()
+    let (b1,b2) = order_branches n1 n2 in
+    let* r = query
+               t.connection
+               ~query:(get_lca_query t.store_name)
+               ~values:[|
+                 Blob (big_of_string b1);
+                 Blob (big_of_string b2)
+               |]
+               ()
     in
-    Result.map
-      (fun v -> Bigstringaf.to_string (get_value v.values.(0).(0)))
-      r
-  let fork : t -> branch -> branch -> (string, string) result
-    = fun t n1 n2 ->
-    let r = Result.bind (get_latest t n1)       (fun v ->
-            Result.bind (update_branch t n2 v)  (fun _ ->
-                         update_lca t n1 n2 v))
+    let row = r.values.(0) in
+    Ok
+      { Version.branch = get_string row.(0);
+        version_num = get_int row.(1);
+        content_id = get_string row.(2)
+      }
+  let fork : t -> branch -> branch -> (version, string) result
+    = fun t old_branch new_branch ->
+    let* old_version = get_head t old_branch in
+    let new_version =
+      { branch = new_branch;
+        version_num = 0;
+        content_id = old_version.content_id;
+      }
     in
-    Result.map (fun _ -> n2) r
+    let* _ = Graph.add_version
+               t.version_graph
+               new_version
+               [old_version]
+    in
+    let* _ = update_head t new_version in
+    let* _ = update_lca t old_branch new_branch old_version in
+    Ok new_version
   let pull : mergefun -> t -> branch -> branch -> (unit, string) result
     = fun merge t from_b into_b ->
-    Result.bind (get_latest t into_b)     (fun into_v ->
-    Result.bind (get_latest t from_b)     (fun from_v ->
-    Result.bind (get_lca t from_b into_b) (fun lca_v ->
+    let* into_v = get_head t into_b in
+    let* from_v = get_head t from_b in
+    let* lca_v = get_lca t from_b into_b in
     if lca_v = from_v
     then
       (* Case 1: There is nothing to update *)
       Ok ()
     else if lca_v = into_v
     then
-      (* Case 2: Fast-forward to from_b's value *)
-      Result.bind (update_branch t into_b from_v)     (fun _ ->
-      Result.bind (update_lca t from_b into_b from_v) (fun _ ->
-      Ok () ))
+      (* Case 2: Fast-forward to match from_b's version *)
+      let new_version = bump_version into_v from_v.content_id in
+      (* New version gets both heads as parents *)
+      let* _ = Graph.add_version
+                 t.version_graph
+                 new_version
+                 [from_v; into_v]
+      in
+      let* _ = update_head t new_version in
+      let* _ = update_lca t from_b into_b from_v in
+      Ok ()
     else
       (* Case 3: Perform 3-way merge *)
       (* Get merged value *)
-      Result.bind (merge lca_v into_v from_v)      (fun m_v ->
+      let* new_cid = merge
+                       lca_v.content_id
+                       into_v.content_id
+                       from_v.content_id
+      in
       (* Update into-branch to merged value *)
-      Result.bind (update_branch t into_b m_v)     (fun _ ->
+      let new_version = bump_version into_v new_cid in
+      (* New version gets both heads as parents *)
+      let* _ = Graph.add_version
+                 t.version_graph
+                 new_version
+                 [from_v; into_v]
+      in
+      let* _ = update_head t new_version in
       (* Update lca to from-branch's value *)
-      Result.bind (update_lca t from_b into_b from_v) (fun _ ->
-  
-      Ok () ))) )))
+      let* _ = update_lca t from_b into_b from_v in
+      Ok ()
 end
