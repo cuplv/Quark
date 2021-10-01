@@ -151,5 +151,7 @@ module Graph = struct
          (* Continue search breadth-first. *)
          hunt_for th vs'' v
   let is_ancestor th v1 v2 =
-    Ok (hunt_for th (parents th v2 |> Result.get_ok) v1)
+    hunt_for th (parents th v2 |> Result.get_ok) v1
+  let is_concurrent th v1 v2 =
+    not (is_ancestor th v1 v2 || is_ancestor th v2 v1)
 end

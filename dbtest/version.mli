@@ -54,7 +54,11 @@ module Graph : sig
   (** [parents h v] gives a list of the direct parents of v in the
      graph. *)
 
-  val is_ancestor : handle -> t -> t -> (bool, string) result
+  val is_ancestor : handle -> t -> t -> bool
   (** [is_ancestor h v1 v2] checks whether v1 is an ancestor of v2. *)
+
+  val is_concurrent : handle -> t -> t -> bool
+  (** [is_concurrent h v1 v2] returns true when neither v1 nor v2 is an
+     ancestor of the other. *)
 
 end
