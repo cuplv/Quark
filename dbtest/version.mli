@@ -35,19 +35,26 @@ val of_row : Scylla.Protocol.value array -> t
 val to_row : t -> Scylla.Protocol.value array
 (** Convert a version into a database row (Blob, Int, Blob). *)
 
+val compare : t -> t -> int
+(** Compare two versions. *)
+
 module Graph : sig
   type handle
+  (** An open connection to a graph in a database. *)
 
   val init : string -> Scylla.conn -> (handle, string) result
   (** [init name conn] creates a database table using name, if it does
      not already exist. *)
 
+  val add_version : handle -> t -> t list -> (unit, string) result
+  (** [add_version h v ps] adds v as a new vertex in the graph, using
+     existing vertexes ps as v's parents. *)
+
   val parents : handle -> t -> (t list, string) result
   (** [parents h v] gives a list of the direct parents of v in the
      graph. *)
 
-  val add_version : handle -> t -> t list -> (unit, string) result
-  (** [add_version h v ps] adds v as a new vertex in the graph, using
-     existing vertexes ps as v's parents. *)
+  val is_ancestor : handle -> t -> t -> (bool, string) result
+  (** [is_ancestor h v1 v2] checks whether v1 is an ancestor of v2. *)
 
 end

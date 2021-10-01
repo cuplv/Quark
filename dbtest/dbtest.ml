@@ -35,9 +35,9 @@ let find = Store.find cs
 
 (* A simple merge function for append-only strings. Assume that the
    LCA is a prefix of both strings (hence append-only), and then
-   append the remainder of v2, and then the remainder of v1.
+   append the remainder of v1, and then the remainder of v2.
 
-   For example, str_merge("A","AC","AB") = "ABC" *)
+   For example, str_merge("A","AB","AC") = "ABC" *)
 let str_merge lca v1 v2 =
   Result.bind (find lca) (fun lca_s ->
   Result.bind (find v1)  (fun v1_s ->
@@ -46,7 +46,7 @@ let str_merge lca v1 v2 =
   let l = String.length lca_s in
   let d1 = String.sub v1_s l (String.length v1_s - l) in
   let d2 = String.sub v2_s l (String.length v2_s - l) in
-  let hash = store (lca_s ^ d2 ^ d1) in
+  let hash = store (lca_s ^ d1 ^ d2) in
   Ok hash )))
 
 let latest b =

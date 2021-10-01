@@ -13,6 +13,8 @@ type t =
     content_id : Cas.content_id;
   }
 
+type version = t
+
 let branch v = v.branch
 
 let content_id v = v.content_id
@@ -24,7 +26,9 @@ let init : string -> Cas.content_id -> t =
     content_id = c
   }
 
-
+let succeeds_or_eq : t -> t -> bool =
+  fun v2 v1 ->
+  branch v1 = branch v2 && v1.version_num <= v2.version_num
 
 let bump : t -> Cas.content_id -> t =
   fun v c ->
@@ -39,8 +43,8 @@ let fastfwd from_v into_v = bump into_v (content_id from_v)
 
 let merge f lca_v from_v into_v =
   let* new_cid = f lca_v.content_id
-                   into_v.content_id
                    from_v.content_id
+                   into_v.content_id
   in
   Ok (bump into_v new_cid)
 
@@ -58,7 +62,23 @@ let to_row : t -> value array =
      Blob (big_of_string v.content_id)
   |]
 
+let compare : t -> t -> int =
+  fun v1 v2 ->
+  let bc = String.compare v1.branch v2.branch in
+  if bc = 0
+  then let vc = Int.compare v1.version_num v2.version_num in
+       if vc = 0
+       then String.compare v1.content_id v2.content_id
+       else vc
+  else bc
+
+
 module Graph = struct
+  module VSet = Set.Make(struct
+                    type t = version
+                    let compare = compare
+                  end)
+
   let create_graph_query s = Printf.sprintf
     "create table if not exists bstore.%s_version_graph(
        child_branch blob,
@@ -118,4 +138,18 @@ module Graph = struct
                   ()
        in
        add_version th child ps
+  let rec hunt_for : handle -> t list -> t -> bool =
+    fun th vs v ->
+    if List.exists (succeeds_or_eq v) vs
+    then true
+    else let vs' = List.concat_map
+                     (fun c -> parents th c |> Result.get_ok)
+                     vs
+         in
+         (* Remove duplicates. *)
+         let vs'' = VSet.elements (VSet.of_list vs') in
+         (* Continue search breadth-first. *)
+         hunt_for th vs'' v
+  let is_ancestor th v1 v2 =
+    Ok (hunt_for th (parents th v2 |> Result.get_ok) v1)
 end
