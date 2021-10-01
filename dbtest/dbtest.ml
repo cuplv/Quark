@@ -2,8 +2,6 @@ module Store = Cas.Store (Cas.StrData)
 module BS = BStore.Store
 module VS = Version.Graph
 
-open Version
-
 let earth : Cas.StrData.t = "Earth"
 
 let moon = "Moon"
@@ -53,7 +51,7 @@ let str_merge lca v1 v2 =
 
 let latest b =
   Result.bind (BS.get_head bs b)  (fun k ->
-  Result.bind (find k.content_id) (fun v ->
+  Result.bind (find (Version.content_id k)) (fun v ->
   Ok v ))
 
 let update b s =
@@ -61,14 +59,14 @@ let update b s =
   let o = BS.get_head_opt bs b |> Result.get_ok in
   match o with
   | Some h -> 
-      let r = BS.update_head bs (bump_version h k) in
+      let r = BS.update_head bs (Version.bump h k) in
       let () = Printf.printf "Updated branch %s with value \"%s\".\n"
                  b
                  (latest b |> Result.get_ok)
       in
       r
   | None ->
-     let r = BS.update_head bs (init_version b k) in
+     let r = BS.update_head bs (Version.init b k) in
      let () = Printf.printf "Created branch %s with value \"%s\".\n"
                 b
                 (latest b |> Result.get_ok)

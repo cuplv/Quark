@@ -3,7 +3,7 @@ open Scylla.Protocol
 
 open Util
 
-open Version
+type version = Version.t
 
 let ks_query = Printf.sprintf
   "create keyspace if not exists bstore
@@ -83,7 +83,7 @@ module Store = struct
   type t =
     { store_name : string;
       connection : conn;
-      version_graph : Version.Graph.t
+      version_graph : Version.Graph.handle
     }
   let init s conn =
     let* _ = query conn ~query:ks_query () in
@@ -103,16 +103,12 @@ module Store = struct
           |> Result.get_ok
     in
     Array.map get_branch_name r.values
-  let update_head : t -> Version.version -> (unit, string) result =
+  let update_head : t -> version -> (unit, string) result =
     fun t v ->
     let* _ = query
                t.connection
                ~query:(upsert_branch_query t.store_name)
-               ~values:[|
-                 Blob (big_of_string v.branch);
-                 Int (Int32.of_int v.version_num);
-                 Blob (big_of_string v.content_id);
-               |]
+               ~values:(Version.to_row v)
                ()
     in
     Ok ()
@@ -125,7 +121,7 @@ module Store = struct
                ()
     in
     if Array.length r.values > 0
-    then Ok (Some (version_from_row r.values.(0)))
+    then Ok (Some (Version.of_row r.values.(0)))
     else Ok None
   let get_head : t -> branch -> (version, string) result =
     fun t b ->
@@ -137,15 +133,13 @@ module Store = struct
     let* _ = query
                t.connection
                ~query:(upsert_lca_query t.store_name)
-               ~values:[|
-                 (* Branches *)
-                 Blob (big_of_string b1);
-                 Blob (big_of_string b2);
-                 (* LCA version *)
-                 Blob (big_of_string lca.branch);
-                 Int (Int32.of_int lca.version_num);
-                 Blob (big_of_string lca.content_id)
-               |]
+               ~values:(Array.append
+                          (* Branches *)
+                          [| Blob (big_of_string b1);
+                             Blob (big_of_string b2)
+                          |]
+                          (* LCA version *)
+                          (Version.to_row lca))
                ()
     in
     Ok ()
@@ -161,22 +155,13 @@ module Store = struct
                |]
                ()
     in
-    let row = r.values.(0) in
-    Ok
-      { Version.branch = get_string row.(0);
-        version_num = get_int row.(1);
-        content_id = get_string row.(2)
-      }
+    Ok (Version.of_row r.values.(0))
   let fork : t -> branch -> branch -> (version, string) result
     = fun t old_branch new_branch ->
     let* old_version = get_head t old_branch in
-    let new_version =
-      { branch = new_branch;
-        version_num = 0;
-        content_id = old_version.content_id;
-      }
+    let new_version = Version.fork new_branch old_version
     in
-    let* _ = Graph.add_version
+    let* _ = Version.Graph.add_version
                t.version_graph
                new_version
                [old_version]
@@ -185,7 +170,7 @@ module Store = struct
     let* _ = update_lca t old_branch new_branch old_version in
     Ok new_version
   let pull : mergefun -> t -> branch -> branch -> (unit, string) result
-    = fun merge t from_b into_b ->
+    = fun mergefun t from_b into_b ->
     let* into_v = get_head t into_b in
     let* from_v = get_head t from_b in
     let* lca_v = get_lca t from_b into_b in
@@ -196,9 +181,9 @@ module Store = struct
     else if lca_v = into_v
     then
       (* Case 2: Fast-forward to match from_b's version *)
-      let new_version = bump_version into_v from_v.content_id in
+      let new_version = Version.fastfwd from_v into_v in
       (* New version gets both heads as parents *)
-      let* _ = Graph.add_version
+      let* _ = Version.Graph.add_version
                  t.version_graph
                  new_version
                  [from_v; into_v]
@@ -209,15 +194,9 @@ module Store = struct
     else
       (* Case 3: Perform 3-way merge *)
       (* Get merged value *)
-      let* new_cid = merge
-                       lca_v.content_id
-                       into_v.content_id
-                       from_v.content_id
-      in
-      (* Update into-branch to merged value *)
-      let new_version = bump_version into_v new_cid in
+      let* new_version = Version.merge mergefun lca_v from_v into_v in
       (* New version gets both heads as parents *)
-      let* _ = Graph.add_version
+      let* _ = Version.Graph.add_version
                  t.version_graph
                  new_version
                  [from_v; into_v]

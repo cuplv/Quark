@@ -3,50 +3,62 @@ open Scylla.Protocol
 
 open Util
 
+type conn = Scylla.conn
 
-(* A version in a branch's history *)
-type version =
+type value = Scylla.Protocol.value
+
+type t =
   { branch : string;
     version_num : int;
     content_id : Cas.content_id;
   }
 
-let init_version : string -> Cas.content_id -> version =
+let branch v = v.branch
+
+let content_id v = v.content_id
+
+let init : string -> Cas.content_id -> t =
   fun b c ->
   { branch = b;
     version_num = 0;
     content_id = c
   }
 
-let bump_version : version -> Cas.content_id -> version =
+
+
+let bump : t -> Cas.content_id -> t =
   fun v c ->
   { branch = v.branch;
     version_num = v.version_num + 1;
     content_id = c
   }
 
-let version_from_row : value array -> version =
+let fork new_branch v = init new_branch (content_id v)
+
+let fastfwd from_v into_v = bump into_v (content_id from_v)
+
+let merge f lca_v from_v into_v =
+  let* new_cid = f lca_v.content_id
+                   into_v.content_id
+                   from_v.content_id
+  in
+  Ok (bump into_v new_cid)
+
+let of_row : value array -> t =
   fun row ->
   { branch = get_string row.(0);
     version_num = get_int row.(1);
     content_id = get_string row.(2);
   }
 
-let version_to_row : version -> value array =
+let to_row : t -> value array =
   fun v ->
   [| Blob (big_of_string v.branch);
      Int (Int32.of_int v.version_num);
      Blob (big_of_string v.content_id)
   |]
 
-module type Graph_type = sig
-  type t
-  val init : string -> conn -> (t, string) result
-  val parents : t -> version -> (version list, string) result
-  val add_version : t -> version -> version list -> (unit, string) result
-end
-
-module Graph : Graph_type = struct
+module Graph = struct
   let create_graph_query s = Printf.sprintf
     "create table if not exists bstore.%s_version_graph(
        child_branch blob,
@@ -79,32 +91,22 @@ module Graph : Graph_type = struct
      VALUES (?,?,?,?,?,?)"
     s
 
-  type t = table_handle
-  let init : string -> conn -> (t, string) result =
+  type handle = table_handle
+  let init : string -> conn -> (handle, string) result =
     fun s conn ->
     let* _ = query conn ~query:(create_graph_query s) () in
     Ok { store_name = s; connection = conn }
-  let parents : t -> version -> (version list, string) result =
+  let parents : handle -> t -> (t list, string) result =
     fun th v ->
     let* r = query
                th.connection
                ~query:(parents_query th.store_name)
-               ~values:[|
-                 Blob (big_of_string v.branch);
-                 Int (Int32.of_int v.version_num)
-               |]
+               ~values:(Array.sub (to_row v) 0 2)
                ()
     in
-    let f : value array -> version list -> version list =
-      fun row ls ->
-      { branch = get_string row.(0);
-        version_num = get_int row.(1);
-        content_id = get_string row.(2);
-      }
-      :: ls
-    in
+    let f row ls = of_row row :: ls in
     Ok (Array.fold_right f r.values [])
-  let rec add_version : t -> version -> version list -> (unit, string) result =
+  let rec add_version : handle -> t -> t list -> (unit, string) result =
     fun th child parents ->
     match parents with
     | [] -> Ok ()
@@ -112,16 +114,7 @@ module Graph : Graph_type = struct
        let* _ = query
                   th.connection
                   ~query:(add_query th.store_name)
-                  ~values:[|
-                    (* Child values *)
-                    Blob (big_of_string child.branch);
-                    Int (Int32.of_int child.version_num);
-                    Blob (big_of_string child.content_id);
-                    (* Parent values *)
-                    Blob (big_of_string p.branch);
-                    Int (Int32.of_int p.version_num);
-                    Blob (big_of_string p.content_id)
-                  |]
+                  ~values:(Array.append (to_row child) (to_row p))
                   ()
        in
        add_version th child ps
