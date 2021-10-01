@@ -2,6 +2,8 @@ module Store = Cas.Store (Cas.StrData)
 module BS = BStore.Store
 module VS = Version.Graph
 
+open Util
+
 let earth : Cas.StrData.t = "Earth"
 
 let moon = "Moon"
@@ -37,17 +39,29 @@ let find = Store.find cs
    LCA is a prefix of both strings (hence append-only), and then
    append the remainder of v1, and then the remainder of v2.
 
-   For example, str_merge("A","AB","AC") = "ABC" *)
+   For example, [str_merge "A" "AB" "AC" = "ABC"].
+
+   If the new versions are not both longer than or equal to the LCA,
+   then the second version is taken as the whole merged value.
+
+  For example, [str_merge "AB" "ABC" "D" = "D"].
+
+*)
 let str_merge lca v1 v2 =
-  Result.bind (find lca) (fun lca_s ->
-  Result.bind (find v1)  (fun v1_s ->
-  Result.bind (find v2)  (fun v2_s ->
+  let* lca_s = find lca in
+  let* v1_s = find v1 in
+  let* v2_s = find v2 in
   let _ = Printf.printf "Merging strings.\n" in
-  let l = String.length lca_s in
-  let d1 = String.sub v1_s l (String.length v1_s - l) in
-  let d2 = String.sub v2_s l (String.length v2_s - l) in
-  let hash = store (lca_s ^ d1 ^ d2) in
-  Ok hash )))
+  if String.length lca_s <= String.length v1_s
+     && String.length lca_s <= String.length v2_s
+  then
+    let l = String.length lca_s in
+    let d1 = String.sub v1_s l (String.length v1_s - l) in
+    let d2 = String.sub v2_s l (String.length v2_s - l) in
+    let hash = store (lca_s ^ d1 ^ d2) in
+    Ok hash
+  else
+    Ok v2
 
 let latest b =
   Result.bind (BS.get_head bs b)  (fun k ->
@@ -109,3 +123,27 @@ let _ = pull b1 b2
 let _ = update b1 "Hello Moon Earth, Mars, etc."
 
 let _ = pull b1 b2
+
+let _ = update "c" "A"
+
+let _ = fork "c" "ca1"
+let _ = update "ca1" "A1"
+
+let _ = fork "c" "ca2"
+let _ = update "ca2" "A2"
+
+let _ = fork "c" "cc1"
+let _ = pull "ca1" "cc1"
+
+let _ = fork "c" "cc2"
+let _ = pull "ca2" "cc2"
+
+let _ = fork "c" "cc3"
+let _ = pull "ca1" "cc3"
+let _ = pull "ca2" "cc3"
+
+let r = pull "cc2" "cc1"
+let _ = match r with
+  | Ok (Error b) -> Printf.printf "Merge blocked by %s.\n" b
+  | Ok (Ok ()) -> Printf.printf "Merge not blocked.\n"
+  | _ -> ()
