@@ -150,6 +150,19 @@ module Store = struct
                ()
     in
     Ok (Version.of_row r.values.(0))
+  let get_other_lcas : t -> branch -> branch -> (branch * version * version) list
+    = fun t b1 b2 ->
+    (* Get other branches *)
+    let other_bs = List.filter
+                     (fun b -> b <> b1 && b <> b2)
+                     (list_branches t)
+    in
+    (* Get tuples (other_branch, lca_with_from, lca_with_into) *)
+    List.map
+      (fun b -> (b,
+                 get_lca t b1 b |> Result.get_ok,
+                 get_lca t b2 b |> Result.get_ok))
+      other_bs
   let fork : t -> branch -> branch -> (version, string) result
     = fun t old_branch new_branch ->
     let* old_version = get_head t old_branch in
@@ -162,6 +175,11 @@ module Store = struct
     in
     let* _ = update_head t new_version in
     let* _ = update_lca t old_branch new_branch old_version in
+    let _ = List.iter
+              (fun (b,lca,_) -> update_lca t b new_branch lca
+                                |> Result.get_ok)
+              (get_other_lcas t old_branch new_branch)
+    in
     Ok new_version
   let pull : mergefun -> t -> branch -> branch -> ((unit, branch) result, string) result
     = fun mergefun t from_b into_b ->
@@ -173,18 +191,7 @@ module Store = struct
       (* There is nothing to update. *)
       Ok (Ok ())
     else
-      (* Get other branches *)
-      let other_bs = List.filter
-                       (fun b -> b <> from_b && b <> into_b)
-                       (list_branches t)
-      in
-      (* Get tuples (other_branch, lca_with_from, lca_with_into) *)
-      let other_lcas = List.map
-                         (fun b -> (b,
-                                    get_lca t from_b b |> Result.get_ok,
-                                    get_lca t into_b b |> Result.get_ok))
-                         other_bs
-      in
+      let other_lcas = get_other_lcas t from_b into_b in
       (* Find any violation of the "no concurrent LCAs for other
          branches" requirement. *)
       let r = List.find_opt
