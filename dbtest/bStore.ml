@@ -137,7 +137,7 @@ module Store = struct
                ()
     in
     Ok ()
-  let get_lca : t -> branch -> branch -> (version, string) result
+  let get_lca : t -> branch -> branch -> (version option, string) result
     = fun t n1 n2 ->
     let (b1,b2) = order_branches n1 n2 in
     let* r = query
@@ -149,7 +149,9 @@ module Store = struct
                |]
                ()
     in
-    Ok (Version.of_row r.values.(0))
+    if Array.length r.values > 0
+    then Ok (Some (Version.of_row r.values.(0)))
+    else Ok None
   let get_other_lcas : t -> branch -> branch -> (branch * version * version) list
     = fun t b1 b2 ->
     (* Get other branches *)
@@ -158,11 +160,13 @@ module Store = struct
                      (list_branches t)
     in
     (* Get tuples (other_branch, lca_with_from, lca_with_into) *)
-    List.map
-      (fun b -> (b,
-                 get_lca t b1 b |> Result.get_ok,
-                 get_lca t b2 b |> Result.get_ok))
+    List.fold_right
+      (fun b ls -> match (get_lca t b1 b |> Result.get_ok,
+                       get_lca t b2 b |> Result.get_ok) with
+                   | (Some lca1, Some lca2) -> (b, lca1, lca2) :: ls
+                   | _ -> ls)
       other_bs
+      []
   let fork : t -> branch -> branch -> (version, string) result
     = fun t old_branch new_branch ->
     let* old_version = get_head t old_branch in
@@ -186,6 +190,7 @@ module Store = struct
     let* into_v = get_head t into_b in
     let* from_v = get_head t from_b in
     let* lca_v = get_lca t from_b into_b in
+    let lca_v = Option.get lca_v in
     if lca_v = from_v
     then
       (* There is nothing to update. *)
