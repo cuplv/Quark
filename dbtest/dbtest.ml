@@ -51,7 +51,6 @@ let str_merge lca v1 v2 =
   let* lca_s = find lca in
   let* v1_s = find v1 in
   let* v2_s = find v2 in
-  let _ = Printf.printf "Merging strings.\n" in
   if String.length lca_s <= String.length v1_s
      && String.length lca_s <= String.length v2_s
   then
@@ -72,20 +71,21 @@ let update b s =
   let k = store s in
   let o = BS.get_head_opt bs b |> Result.get_ok in
   match o with
-  | Some h -> 
-      let r = BS.update_head bs (Version.bump h k) in
-      let () = Printf.printf "Updated branch %s with value \"%s\".\n"
-                 b
-                 (latest b |> Result.get_ok)
-      in
-      r
+  | Some _ ->
+      BS.commit bs b k
+      (* let r = BS.update_head bs (Version.bump h k) in
+       * let () = Printf.printf "Updated branch %s with value \"%s\".\n"
+       *            b
+       *            (latest b |> Result.get_ok)
+       * in
+       * r *)
   | None ->
-     let r = BS.update_head bs (Version.init b k) in
+     let _ = BS.update_head bs (Version.init b k) in
      let () = Printf.printf "Created branch %s with value \"%s\".\n"
                 b
                 (latest b |> Result.get_ok)
      in
-     r
+     Ok (Version.init b k)
 
 let fork b1 b2 =
   let r = BS.fork bs b1 b2 in
@@ -93,13 +93,27 @@ let fork b1 b2 =
   r
 
 let pull from_b into_b =
-  let r = BS.pull str_merge bs from_b into_b in
-  let () = Printf.printf "Pulled from %s into %s to get \"%s\".\n"
-             from_b
-             into_b
-             (latest into_b |> Result.get_ok)
-  in
-  r
+  match BS.pull str_merge bs from_b into_b |> Result.get_ok with
+  | Ok () -> Printf.printf "Pulled from %s into %s to get \"%s\".\n"
+               from_b
+               into_b
+               (latest into_b |> Result.get_ok)
+  | Error Unrelated -> Printf.printf
+                         "Pull failed: %s and %s are unrelated.\n"
+                         from_b
+                         into_b
+  | Error (Blocked b) -> Printf.printf
+                           "Pull failed: %s and %s are blocked by %s.\n"
+                           from_b
+                           into_b
+                           b
+  (* let r = BS.pull str_merge bs from_b into_b in
+   * let () = Printf.printf "Pulled from %s into %s to get \"%s\".\n"
+   *            from_b
+   *            into_b
+   *            (latest into_b |> Result.get_ok)
+   * in
+   * r *)
 
 let b1 = "b1"
 let b2 = "b2"
@@ -142,8 +156,4 @@ let _ = fork "c" "cc3"
 let _ = pull "ca1" "cc3"
 let _ = pull "ca2" "cc3"
 
-let r = pull "cc2" "cc1"
-let _ = match r with
-  | Ok (Error b) -> Printf.printf "Merge blocked by %s.\n" b
-  | Ok (Ok ()) -> Printf.printf "Merge not blocked.\n"
-  | _ -> ()
+let _ = pull "cc2" "cc1"

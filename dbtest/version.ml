@@ -95,9 +95,9 @@ module Graph = struct
     s
   
   let parents_query s = Printf.sprintf
-    "select parent_branch, parent_version, parent_content_id
+    "select parent_branch, parent_version_num, parent_content_id
      from bstore.%s_version_graph
-     where child_branch = ? and child_version = ?"
+     where child_branch = ? and child_version_num = ?"
     s
   
   let add_query s = Printf.sprintf
@@ -140,16 +140,21 @@ module Graph = struct
        add_version th child ps
   let rec hunt_for : handle -> t list -> t -> bool =
     fun th vs v ->
-    if List.exists (succeeds_or_eq v) vs
-    then true
-    else let vs' = List.concat_map
-                     (fun c -> parents th c |> Result.get_ok)
-                     vs
-         in
-         (* Remove duplicates. *)
-         let vs'' = VSet.elements (VSet.of_list vs') in
-         (* Continue search breadth-first. *)
-         hunt_for th vs'' v
+    (* let _ = Printf.printf "Hunt for\n" in
+     * let _ = List.iter (fun v -> Printf.printf "%s:%d " v.branch v.version_num) vs in
+     * let _ = Printf.printf "\n" in *)
+    match vs with
+    | [] -> false
+    | _ -> if List.exists (succeeds_or_eq v) vs
+           then true
+           else let vs' = List.concat_map
+                            (fun c -> parents th c |> Result.get_ok)
+                            vs
+                in
+                (* Remove duplicates. *)
+                let vs'' = VSet.elements (VSet.of_list vs') in
+                (* Continue search breadth-first. *)
+                hunt_for th vs'' v
   let is_ancestor th v1 v2 =
     hunt_for th (parents th v2 |> Result.get_ok) v1
   let is_concurrent th v1 v2 =

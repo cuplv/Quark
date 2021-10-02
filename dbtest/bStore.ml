@@ -79,6 +79,7 @@ module Store = struct
       connection : conn;
       version_graph : Version.Graph.handle
     }
+  type pull_error = Unrelated | Blocked of branch
   let init s conn =
     let* _ = query conn ~query:ks_query () in
     let* graph = Version.Graph.init s conn in
@@ -164,14 +165,25 @@ module Store = struct
       (fun b ls -> match (get_lca t b1 b |> Result.get_ok,
                        get_lca t b2 b |> Result.get_ok) with
                    | (Some lca1, Some lca2) -> (b, lca1, lca2) :: ls
+                   | (Some lca1, None) -> (b, lca1, lca1) :: ls
                    | _ -> ls)
       other_bs
       []
+  let commit : t -> branch -> Cas.content_id -> (version, string) result
+    = fun t b c ->
+    let* old_version = get_head t b in
+    let new_version = Version.bump old_version c in
+    let* _ = Version.Graph.add_version
+               t.version_graph
+               new_version
+               [old_version]
+    in
+    let* _ = update_head t new_version in
+    Ok new_version
   let fork : t -> branch -> branch -> (version, string) result
     = fun t old_branch new_branch ->
     let* old_version = get_head t old_branch in
-    let new_version = Version.fork new_branch old_version
-    in
+    let new_version = Version.fork new_branch old_version in
     let* _ = Version.Graph.add_version
                t.version_graph
                new_version
@@ -185,58 +197,60 @@ module Store = struct
               (get_other_lcas t old_branch new_branch)
     in
     Ok new_version
-  let pull : mergefun -> t -> branch -> branch -> ((unit, branch) result, string) result
+  let pull : mergefun -> t -> branch -> branch -> ((unit, pull_error) result, string) result
     = fun mergefun t from_b into_b ->
     let* into_v = get_head t into_b in
     let* from_v = get_head t from_b in
-    let* lca_v = get_lca t from_b into_b in
-    let lca_v = Option.get lca_v in
-    if lca_v = from_v
-    then
-      (* There is nothing to update. *)
-      Ok (Ok ())
-    else
-      let other_lcas = get_other_lcas t from_b into_b in
-      (* Find any violation of the "no concurrent LCAs for other
-         branches" requirement. *)
-      let r = List.find_opt
-                (fun (_,from_lca,into_lca) ->
-                  Version.Graph.is_concurrent
-                     t.version_graph
-                     from_lca
-                     into_lca)
-                other_lcas
-      in
-      match r with
-      | None ->
-         (* No violations of the requirement, proceeding with update. *)
-
-         (* Create new version using either fastfwd or merge. *)
-         let new_v = if lca_v = into_v
-                     then Version.fastfwd from_v into_v
-                     else Version.merge mergefun lca_v from_v into_v
-                          |> Result.get_ok
-         in
-         (* Update head of into_b to the new version. *)
-         let* _ = update_head t new_v in
-         (* Update LCA between from_b and into_b, using from_b's head
-            as LCA version. *)
-         let* _ = update_lca t from_b into_b from_v in
-         (* Update the other branches' LCAs for into_b. *)
-         let _ = List.map
-                   (fun (other_b,from_lca,into_lca) ->
-                     if Version.Graph.is_ancestor
-                          t.version_graph
-                          into_lca
-                          from_lca
-                     then update_lca t into_b other_b from_lca
-                          |> Result.get_ok
-                     else ())
+    let* lca = get_lca t from_b into_b in
+    match lca with
+    | None -> Ok (Result.Error Unrelated)
+    | Some lca_v ->
+       if lca_v = from_v
+       then
+         (* There is nothing to update. *)
+         Ok (Ok ())
+       else
+         let other_lcas = get_other_lcas t from_b into_b in
+         (* Find any violation of the "no concurrent LCAs for other
+            branches" requirement. *)
+         let r = List.find_opt
+                   (fun (_,from_lca,into_lca) ->
+                     Version.Graph.is_concurrent
+                        t.version_graph
+                        from_lca
+                        into_lca)
                    other_lcas
          in
-         (* Update was successful. *)
-         Ok (Ok ())
-      | Some (b,_,_) ->
-         (* No database errors, but update was blocked due to this other branch. *)
-         Ok (Error b)
+         match r with
+         | None ->
+            (* No violations of the requirement, proceeding with update. *)
+   
+            (* Create new version using either fastfwd or merge. *)
+            let new_v = if lca_v = into_v
+                        then Version.fastfwd from_v into_v
+                        else Version.merge mergefun lca_v from_v into_v
+                             |> Result.get_ok
+            in
+            (* Update head of into_b to the new version. *)
+            let* _ = update_head t new_v in
+            (* Update LCA between from_b and into_b, using from_b's head
+               as LCA version. *)
+            let* _ = update_lca t from_b into_b from_v in
+            (* Update the other branches' LCAs for into_b. *)
+            let _ = List.map
+                      (fun (other_b,from_lca,into_lca) ->
+                        if Version.Graph.is_ancestor
+                             t.version_graph
+                             into_lca
+                             from_lca
+                        then update_lca t into_b other_b from_lca
+                             |> Result.get_ok
+                        else ())
+                      other_lcas
+            in
+            (* Update was successful. *)
+            Ok (Ok ())
+         | Some (b,_,_) ->
+            (* No database errors, but update was blocked due to this other branch. *)
+            Ok (Error (Blocked b))
 end
