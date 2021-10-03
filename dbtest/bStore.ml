@@ -169,7 +169,7 @@ module Store = struct
                    | _ -> ls)
       other_bs
       []
-  let commit : t -> branch -> Cas.content_id -> (version, string) result
+  let commit : t -> branch -> Content.id -> (version, string) result
     = fun t b c ->
     let* old_version = get_head t b in
     let new_version = Version.bump old_version c in

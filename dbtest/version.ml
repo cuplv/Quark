@@ -10,7 +10,7 @@ type value = Scylla.Protocol.value
 type t =
   { branch : string;
     version_num : int;
-    content_id : Cas.content_id;
+    content_id : Content.id;
   }
 
 type version = t
@@ -19,7 +19,7 @@ let branch v = v.branch
 
 let content_id v = v.content_id
 
-let init : string -> Cas.content_id -> t =
+let init : string -> Content.id -> t =
   fun b c ->
   { branch = b;
     version_num = 0;
@@ -30,7 +30,7 @@ let succeeds_or_eq : t -> t -> bool =
   fun v2 v1 ->
   branch v1 = branch v2 && v1.version_num <= v2.version_num
 
-let bump : t -> Cas.content_id -> t =
+let bump : t -> Content.id -> t =
   fun v c ->
   { branch = v.branch;
     version_num = v.version_num + 1;

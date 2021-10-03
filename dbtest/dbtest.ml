@@ -1,10 +1,10 @@
-module Store = Cas.Store (Cas.StrData)
+module Store = ContentStore.Make (StringData)
 module BS = BStore.Store
 module VS = Version.Graph
 
 open Util
 
-let earth : Cas.StrData.t = "Earth"
+let earth = "Earth"
 
 let moon = "Moon"
 
@@ -31,9 +31,9 @@ let vs =
 
 let () = Printf.printf "Created store tables.\n"
 
-let store = Store.store cs
+let store = Store.put cs
 
-let find = Store.find cs
+let find = Store.get cs
 
 (* A simple merge function for append-only strings. Assume that the
    LCA is a prefix of both strings (hence append-only), and then
@@ -48,9 +48,9 @@ let find = Store.find cs
 
 *)
 let str_merge lca v1 v2 =
-  let* lca_s = find lca in
-  let* v1_s = find v1 in
-  let* v2_s = find v2 in
+  let lca_s = find lca |> Option.get in
+  let v1_s = find v1 |> Option.get in
+  let v2_s = find v2 |> Option.get in
   if String.length lca_s <= String.length v1_s
      && String.length lca_s <= String.length v2_s
   then
@@ -63,9 +63,8 @@ let str_merge lca v1 v2 =
     Ok v2
 
 let latest b =
-  Result.bind (BS.get_head bs b)  (fun k ->
-  Result.bind (find (Version.content_id k)) (fun v ->
-  Ok v ))
+  let* k = BS.get_head bs b in
+  Ok (find (Version.content_id k) |> Option.get)
 
 let update b s =
   let k = store s in
@@ -73,12 +72,6 @@ let update b s =
   match o with
   | Some _ ->
       BS.commit bs b k
-      (* let r = BS.update_head bs (Version.bump h k) in
-       * let () = Printf.printf "Updated branch %s with value \"%s\".\n"
-       *            b
-       *            (latest b |> Result.get_ok)
-       * in
-       * r *)
   | None ->
      let _ = BS.update_head bs (Version.init b k) in
      let () = Printf.printf "Created branch %s with value \"%s\".\n"
@@ -107,13 +100,6 @@ let pull from_b into_b =
                            from_b
                            into_b
                            b
-  (* let r = BS.pull str_merge bs from_b into_b in
-   * let () = Printf.printf "Pulled from %s into %s to get \"%s\".\n"
-   *            from_b
-   *            into_b
-   *            (latest into_b |> Result.get_ok)
-   * in
-   * r *)
 
 let b1 = "b1"
 let b2 = "b2"

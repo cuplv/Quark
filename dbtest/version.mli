@@ -5,13 +5,13 @@ type t
 val branch : t -> string
 (** Get the branch name of a version *)
 
-val content_id : t -> Cas.content_id
+val content_id : t -> Content.id
 (** Get the content_id of a version *)
 
-val init : string -> Cas.content_id -> t
+val init : string -> Content.id -> t
 (** [init b c] creates a new version with branch name b and content c. *)
 
-val bump : t -> Cas.content_id -> t
+val bump : t -> Content.id -> t
 (** [bump v c] creates a successor version (with same branch name) to
    v, using c as the successor's content. *)
 
