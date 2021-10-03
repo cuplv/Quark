@@ -10,15 +10,15 @@ type id = Digest.t
 module type STORABLE = sig
 
   (** The type of values that can be stored. *)
-  type t
+  type data
   
   (** [hash v] generates a unique content_id from v. *)
-  val hash : t -> id
+  val hash : data -> id
 
   (** Convert to bigstring. *)
-  val to_big : t -> Bigstringaf.t
+  val to_big : data -> Bigstringaf.t
   
   (** Convert from bigstring. *)
-  val from_big : Bigstringaf.t -> t
+  val from_big : Bigstringaf.t -> data
 
 end
