@@ -22,14 +22,5 @@ val set : handle -> branch -> branch -> Version.t -> unit
    does not matter. *)
 val get : handle -> branch -> branch -> Version.t option
 
-(* (\** [get_all_for h "b1"] returns the list of b1's LCAs with all other
- *    branches. The list elements are pairs (b,v) where b' is the name of
- *    the other branch, and v is the LCA version between b1 and b. *\)
- * val get_all_for : handle -> branch -> (branch * version) list
- * 
- * (\** [get_all_for2 h "b1" "b2"] returns the list of b1's LCAs with all
- *    other branches, and also those for "b2". The list elements are
- *    pairs (b,v1,v2) where b is the name of the other branch, v1 is the
- *    LCA version between b1 and b, and v2 is the LCA version between b2
- *    and b. *\)
- * val get_all_for2 : handle -> branch -> branch -> (branch * version * version) list *)
+(** Print the LCA map. *)
+val debug_dump : handle -> unit

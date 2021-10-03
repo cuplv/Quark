@@ -184,5 +184,8 @@ module Make (Data : DATA) = struct
     let hash = put_cs t d in
     set_head t (Version.init name hash)
 
-  let debug_dump t = VersionGraph.debug_dump t.version_graph
+  let debug_dump t =
+    let () = VersionGraph.debug_dump t.version_graph in
+    let () = Printf.printf "\n" in
+    LcaMap.debug_dump t.lca_map
 end

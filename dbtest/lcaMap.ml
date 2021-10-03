@@ -33,6 +33,11 @@ let get_lca_query s = Printf.sprintf
    where branch1 = ? and branch2 = ?"
   s
 
+let debug_query s = Printf.sprintf
+  "select branch1, branch2, lca_branch, lca_version_num
+   from tag.%s_lca"
+  s
+
 (** Put branches in canonical order so that their entry in the LCA map
    can be found. *)
 let order_branches : branch -> branch -> branch * branch =
@@ -74,3 +79,27 @@ let get t n1 n2 =
   if Array.length r.values > 0
   then Some (Version.of_row r.values.(0))
   else None
+
+let debug_dump th =
+  let r = query
+            th.connection
+            ~query:(debug_query th.store_name)
+            ()
+          |> Result.get_ok
+  in
+  let () = Printf.printf "LCA Map: (b1, b2) <- lca)\n" in
+  Array.iter
+    (fun row ->
+      let b1 = get_string row.(0) in
+      let b2 = get_string row.(1) in
+      let lca_b = get_string row.(2) in
+      let lca_vn = get_int row.(3) in
+
+      Printf.printf
+        "(%s, %s) <- %s:%d\n"
+        b1
+        b2
+        lca_b
+        lca_vn)
+    r.values
+  
