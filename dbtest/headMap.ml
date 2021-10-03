@@ -45,7 +45,7 @@ let list_branches t =
               ()
           |> Result.get_ok
     in
-    Array.to_list (Array.map get_string r.values.(0))
+    Array.to_list (Array.map (fun row -> get_string row.(0)) r.values)
 
 let set t v =
   let _ = query

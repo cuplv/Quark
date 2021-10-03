@@ -104,4 +104,6 @@ let _ = pull "ca2" "cc3"
 
 let _ = pull "cc2" "cc1"
 
+let _ = Printf.printf "\n"
+
 let () = DB.debug_dump db

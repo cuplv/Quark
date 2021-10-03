@@ -99,12 +99,15 @@ module Make (Data : DATA) = struct
               new_version
               [old_version]
     in
-    let _ = HeadMap.set t.head_map new_version in
     let _ = set_lca t old_branch new_branch old_version in
+    let _ = Printf.printf "LCAs with: " in
+    let _ = List.iter (fun (b,_) -> Printf.printf "%s, " b) (all_lcas_of t old_branch) in
+    let _ = Printf.printf "\n" in
     let _ = List.iter
               (fun (b',lca) -> set_lca t b' new_branch lca)
               (all_lcas_of t old_branch)
     in
+    let _ = HeadMap.set t.head_map new_version in
     new_branch
 
   (** Merge versions by applying the merge3 function to their
@@ -173,7 +176,7 @@ module Make (Data : DATA) = struct
             (* Update was successful. *)
             Ok ()
          | Some (b,_,_) ->
-            (* No database errors, but update was blocked due to this other branch. *)
+            (* Update was blocked due to this other branch. *)
             Error (Blocked b)
   let read : handle -> branch -> Data.t option
     = fun t name ->
@@ -187,5 +190,9 @@ module Make (Data : DATA) = struct
   let debug_dump t =
     let () = VersionGraph.debug_dump t.version_graph in
     let () = Printf.printf "\n" in
-    LcaMap.debug_dump t.lca_map
+    let () = LcaMap.debug_dump t.lca_map in
+    let () = Printf.printf "\n" in
+    let () = Printf.printf "Branches:\n" in
+    let () = List.iter (fun b -> Printf.printf "%s, " b) (HeadMap.list_branches t.head_map) in
+    Printf.printf "\n"
 end

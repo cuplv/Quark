@@ -99,7 +99,7 @@ let rec hunt_for : handle -> Version.t list -> Version.t -> bool =
 let is_ancestor th v1 v2 =
   hunt_for th (parents th v2) v1
 let is_concurrent th v1 v2 =
-  not (is_ancestor th v1 v2 || is_ancestor th v2 v1)
+  not (v1 = v2 || is_ancestor th v1 v2 || is_ancestor th v2 v1)
 
 let debug_dump th =
   let r = query
