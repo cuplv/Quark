@@ -79,4 +79,6 @@ module Make (Data : DATA) : sig
      reason. *)
   val pull : handle -> branch -> branch -> (unit, pull_error) result
 
+  (** Print information from the database tables for debugging. *)
+  val debug_dump : handle -> unit
 end

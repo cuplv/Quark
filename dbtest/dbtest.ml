@@ -103,3 +103,5 @@ let _ = pull "ca1" "cc3"
 let _ = pull "ca2" "cc3"
 
 let _ = pull "cc2" "cc1"
+
+let () = DB.debug_dump db

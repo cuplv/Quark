@@ -12,6 +12,8 @@ let branch v = v.branch
 
 let content_id v = v.content_id
 
+let version_num v = v.version_num
+
 let init : string -> Content.id -> t =
   fun b c ->
   { branch = b;

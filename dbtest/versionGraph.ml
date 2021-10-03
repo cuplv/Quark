@@ -36,6 +36,17 @@ let add_query s = Printf.sprintf
    VALUES (?,?,?,?,?,?)"
   s
 
+let debug_query s = Printf.sprintf
+  "select 
+     child_branch,
+     child_version_num,
+     child_content_id,
+     parent_branch,
+     parent_version_num,
+     parent_content_id
+   from tag.%s_version_graph"
+  s
+
 type handle = table_handle
 
 let init : string -> Scylla.conn -> (handle, string) result =
@@ -89,3 +100,22 @@ let is_ancestor th v1 v2 =
   hunt_for th (parents th v2) v1
 let is_concurrent th v1 v2 =
   not (is_ancestor th v1 v2 || is_ancestor th v2 v1)
+
+let debug_dump th =
+  let r = query
+            th.connection
+            ~query:(debug_query th.store_name)
+            ()
+          |> Result.get_ok
+  in
+  let () = Printf.printf "Version graph: (child <- parent)\n" in
+  Array.iter
+    (fun row -> let c = Version.of_row (Array.sub row 0 3) in
+                let p = Version.of_row (Array.sub row 3 3) in
+                Printf.printf
+                  "%s:%d <- %s:%d\n"
+                  (Version.branch c)
+                  (Version.version_num c)
+                  (Version.branch p)
+                  (Version.version_num p))
+    r.values

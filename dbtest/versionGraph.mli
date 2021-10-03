@@ -23,3 +23,6 @@ val is_ancestor : handle -> Version.t -> Version.t -> bool
 (** Returns true if the two version are concurrent, meaning that
    neither is an ancestor of the other. *)
 val is_concurrent : handle -> Version.t -> Version.t -> bool
+
+(** Print the version graph. *)
+val debug_dump : handle -> unit

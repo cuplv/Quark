@@ -183,4 +183,6 @@ module Make (Data : DATA) = struct
     = fun t name d ->
     let hash = put_cs t d in
     set_head t (Version.init name hash)
+
+  let debug_dump t = VersionGraph.debug_dump t.version_graph
 end
