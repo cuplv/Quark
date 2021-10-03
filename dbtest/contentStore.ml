@@ -4,27 +4,27 @@ open Scylla.Protocol
 open Util
 
 let ks_query = Printf.sprintf
-  "create keyspace if not exists cas
+  "create keyspace if not exists content
    with replication = {
    'class':'SimpleStrategy',
    'replication_factor':1};"
 
 let create_query s = Printf.sprintf
-  "create table if not exists cas.%s(
+  "create table if not exists content.%s(
    key blob,
    value blob,
    primary key (key))"
   s
 
 let insert_query s = Printf.sprintf
-  "insert into cas.%s(
+  "insert into content.%s(
    key,
    value)
    VALUES (?,?)"
   s
 
 let select_query s = Printf.sprintf
-  "select value from cas.%s where key = ?"
+  "select value from content.%s where key = ?"
   s
 
 module Make (Stored : Content.STORABLE) = struct

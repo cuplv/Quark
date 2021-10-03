@@ -5,7 +5,7 @@ let query = Scylla.query
 module VSet = Set.Make(Version)
 
 let create_graph_query s = Printf.sprintf
-  "create table if not exists bstore.%s_version_graph(
+  "create table if not exists tag.%s_version_graph(
      child_branch blob,
      child_version_num int,
      child_content_id blob,
@@ -21,12 +21,12 @@ let create_graph_query s = Printf.sprintf
 
 let parents_query s = Printf.sprintf
   "select parent_branch, parent_version_num, parent_content_id
-   from bstore.%s_version_graph
+   from tag.%s_version_graph
    where child_branch = ? and child_version_num = ?"
   s
 
 let add_query s = Printf.sprintf
-  "insert into bstore.%s_version_graph(
+  "insert into tag.%s_version_graph(
      child_branch,
      child_version_num,
      child_content_id,

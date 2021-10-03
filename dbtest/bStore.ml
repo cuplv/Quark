@@ -1,34 +1,22 @@
-open Scylla
-
 open Util
 
 type branch = Types.branch
 type version = Version.t
 
-let ks_query = Printf.sprintf
-  "create keyspace if not exists bstore
-   with replication = {
-   'class':'SimpleStrategy',
-   'replication_factor':1};"
-
 module Store = struct
   type t =
-    { store_name : string;
-      connection : conn;
-      head_map : HeadMap.handle;
+    { head_map : HeadMap.handle;
       lca_map : LcaMap.handle;
       version_graph : VersionGraph.handle
     }
   type pull_error = Unrelated | Blocked of branch
   let init s conn =
-    let* _ = query conn ~query:ks_query () in
+    let* _ = KeySpace.create_tag_ks conn in
     let* h = HeadMap.init s conn in
     let* l = LcaMap.init s conn in
     let* graph = VersionGraph.init s conn in
     Ok
-      { store_name = s;
-        connection = conn;
-        head_map = h;
+      { head_map = h;
         lca_map = l;
         version_graph = graph
       }

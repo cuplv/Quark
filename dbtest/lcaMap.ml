@@ -7,7 +7,7 @@ type branch = Types.branch
 type handle = table_handle
 
 let create_lcastore_query s = Printf.sprintf
-  "create table if not exists bstore.%s_lca(
+  "create table if not exists tag.%s_lca(
      branch1 blob,
      branch2 blob,
      lca_branch blob,
@@ -19,7 +19,7 @@ let create_lcastore_query s = Printf.sprintf
   s
 
 let upsert_lca_query s = Printf.sprintf
-  "insert into bstore.%s_lca(
+  "insert into tag.%s_lca(
      branch1,
      branch2,
      lca_branch,
@@ -29,7 +29,7 @@ let upsert_lca_query s = Printf.sprintf
   s
 
 let get_lca_query s = Printf.sprintf
-  "select lca_branch, lca_version_num, lca_content_id from bstore.%s_lca
+  "select lca_branch, lca_version_num, lca_content_id from tag.%s_lca
    where branch1 = ? and branch2 = ?"
   s
 

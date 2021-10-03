@@ -6,7 +6,7 @@ open Util
 type branch = Types.branch
 
 let create_headmap_query s = Printf.sprintf
-  "create table if not exists bstore.%s_head(
+  "create table if not exists tag.%s_head(
      branch blob,
      version_num int,
      content_id blob,
@@ -14,12 +14,12 @@ let create_headmap_query s = Printf.sprintf
   s
 
 let list_query s = Printf.sprintf
-  "select branch from bstore.%s_head"
+  "select branch from tag.%s_head"
   s
 
 (* INSERT updates a row if the primary keys match *)
 let upsert_head_query s = Printf.sprintf
-  "insert into bstore.%s_head(
+  "insert into tag.%s_head(
      branch,
      version_num,
      content_id)
@@ -28,7 +28,7 @@ let upsert_head_query s = Printf.sprintf
 
 let get_head_query s = Printf.sprintf
   "select branch, version_num, content_id
-   from bstore.%s_head
+   from tag.%s_head
    where branch = ?"
   s
 
