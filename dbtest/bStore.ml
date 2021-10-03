@@ -1,5 +1,4 @@
 open Scylla
-open Scylla.Protocol
 
 open Util
 
@@ -12,116 +11,27 @@ let ks_query = Printf.sprintf
    'class':'SimpleStrategy',
    'replication_factor':1};"
 
-let create_bstore_query s = Printf.sprintf
-  "create table if not exists bstore.%s_head(
-     branch blob,
-     version_num int,
-     content_id blob,
-     primary key (branch))"
-  s
-
-let create_lcastore_query s = Printf.sprintf
-  "create table if not exists bstore.%s_lca(
-     branch1 blob,
-     branch2 blob,
-     lca_branch blob,
-     lca_version_num int,
-     lca_content_id blob,
-     primary key (
-       branch1,
-       branch2))"
-  s
-
-let list_query s = Printf.sprintf
-  "select branch from bstore.%s_head"
-  s
-
-(* INSERT updates a row if the primary keys match *)
-let upsert_branch_query s = Printf.sprintf
-  "insert into bstore.%s_head(
-     branch,
-     version_num,
-     content_id)
-   VALUES (?,?,?)"
-  s
-
-let get_head_query s = Printf.sprintf
-  "select branch, version_num, content_id
-   from bstore.%s_head
-   where branch = ?"
-  s
-
-let upsert_lca_query s = Printf.sprintf
-  "insert into bstore.%s_lca(
-     branch1,
-     branch2,
-     lca_branch,
-     lca_version_num,
-     lca_content_id)
-   VALUES (?,?,?,?,?)"
-  s
-
-let get_lca_query s = Printf.sprintf
-  "select lca_branch, lca_version_num, lca_content_id from bstore.%s_lca
-   where branch1 = ? and branch2 = ?"
-  s
-
-let get_branch_name v =
-  Bigstringaf.to_string (get_blob v.(0))
-
-let order_branches : branch -> branch -> branch * branch =
-  fun b1 b2 -> if b1 > b2 then (b1,b2) else (b2,b1)
-
 module Store = struct
   type t =
     { store_name : string;
       connection : conn;
       head_map : HeadMap.handle;
+      lca_map : LcaMap.handle;
       version_graph : VersionGraph.handle
     }
   type pull_error = Unrelated | Blocked of branch
   let init s conn =
     let* _ = query conn ~query:ks_query () in
     let* h = HeadMap.init s conn in
+    let* l = LcaMap.init s conn in
     let* graph = VersionGraph.init s conn in
-    let* _ = query conn ~query:(create_lcastore_query s) () in
     Ok
       { store_name = s;
         connection = conn;
         head_map = h;
+        lca_map = l;
         version_graph = graph
       }
-  let update_lca : t -> branch -> branch -> version -> (unit, string) result
-    = fun t n1 n2 lca ->
-    let (b1,b2) = order_branches n1 n2 in
-    let* _ = query
-               t.connection
-               ~query:(upsert_lca_query t.store_name)
-               ~values:(Array.append
-                          (* Branches *)
-                          [| Blob (big_of_string b1);
-                             Blob (big_of_string b2)
-                          |]
-                          (* LCA version *)
-                          (Version.to_row lca))
-               ()
-    in
-    Ok ()
-  let get_lca : t -> branch -> branch -> (version option, string) result
-    = fun t n1 n2 ->
-    let (b1,b2) = order_branches n1 n2 in
-    let* r = query
-               t.connection
-               ~query:(get_lca_query t.store_name)
-               ~values:[|
-                 Blob (big_of_string b1);
-                 Blob (big_of_string b2)
-               |]
-               ()
-    in
-    if Array.length r.values > 0
-    then Ok (Some (Version.of_row r.values.(0)))
-    else Ok None
   let get_other_lcas : t -> branch -> branch -> (branch * version * version) list
     = fun t b1 b2 ->
     (* Get other branches *)
@@ -130,9 +40,9 @@ module Store = struct
                      (HeadMap.list_branches t.head_map)
     in
     (* Get tuples (other_branch, lca_with_from, lca_with_into) *)
+    let l = t.lca_map in
     List.fold_right
-      (fun b ls -> match (get_lca t b1 b |> Result.get_ok,
-                       get_lca t b2 b |> Result.get_ok) with
+      (fun b ls -> match (LcaMap.get l b1 b,LcaMap.get l b2 b) with
                    | (Some lca1, Some lca2) -> (b, lca1, lca2) :: ls
                    | (Some lca1, None) -> (b, lca1, lca1) :: ls
                    | _ -> ls)
@@ -158,10 +68,9 @@ module Store = struct
               [old_version]
     in
     let _ = HeadMap.set t.head_map new_version in
-    let* _ = update_lca t old_branch new_branch old_version in
+    let _ = LcaMap.set t.lca_map old_branch new_branch old_version in
     let _ = List.iter
-              (fun (b,lca,_) -> update_lca t b new_branch lca
-                                |> Result.get_ok)
+              (fun (b,lca,_) -> LcaMap.set t.lca_map b new_branch lca)
               (get_other_lcas t old_branch new_branch)
     in
     Ok new_version
@@ -169,8 +78,8 @@ module Store = struct
     = fun mergefun t from_b into_b ->
     let into_v = HeadMap.get t.head_map into_b |> Option.get in
     let from_v = HeadMap.get t.head_map from_b |> Option.get in
-    let* lca = get_lca t from_b into_b in
-    match lca with
+    let lca_o = LcaMap.get t.lca_map from_b into_b in
+    match lca_o with
     | None -> Ok (Result.Error Unrelated)
     | Some lca_v ->
        if lca_v = from_v
@@ -203,7 +112,7 @@ module Store = struct
             let _ = HeadMap.set t.head_map new_v in
             (* Update LCA between from_b and into_b, using from_b's head
                as LCA version. *)
-            let* _ = update_lca t from_b into_b from_v in
+            let _ = LcaMap.set t.lca_map from_b into_b from_v in
             (* Update the other branches' LCAs for into_b. *)
             let _ = List.map
                       (fun (other_b,from_lca,into_lca) ->
@@ -211,8 +120,7 @@ module Store = struct
                              t.version_graph
                              into_lca
                              from_lca
-                        then update_lca t into_b other_b from_lca
-                             |> Result.get_ok
+                        then LcaMap.set t.lca_map into_b other_b from_lca
                         else ())
                       other_lcas
             in
