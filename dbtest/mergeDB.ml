@@ -39,6 +39,10 @@ module Make (Data : DATA) = struct
         content_store = cs
       }
 
+  let fresh_init s conn =
+    let* _ = KeySpace.delete_tag_ks conn in
+    init s conn
+
   (** Get LCAs for the given branch with other related branches. *)
   let all_lcas_of : handle -> branch -> (branch * version) list
     = fun t b ->

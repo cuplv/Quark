@@ -9,7 +9,7 @@ let conn = Scylla.connect ~ip:"127.0.0.1" ~port:9042 |> Result.get_ok
 let () = Printf.printf "Opened connection.\n"
 
 let db =
-  match DB.init "my_store" conn with
+  match DB.fresh_init "my_store" conn with
   | Ok s -> s
   | Error e -> let () = Printf.printf "%s" e in exit 1
 
@@ -25,7 +25,7 @@ let new_root b s =
   in
   Ok ()
 
-let update b s =
+let commit b s =
   match DB.commit db b s with
   | Some () ->
      let () = Printf.printf "Updated branch %s to value \"%s\".\n"
@@ -68,29 +68,29 @@ let _ = new_root b1 "Hello"
 
 let _ = fork b1 b2
 
-let _ = update b2 "Hello Earth"
+let _ = commit b2 "Hello Earth"
 
-let _ = update b1 "Hello Moon"
+let _ = commit b1 "Hello Moon"
 
 let _ = pull b1 b2
 
-let _ = update b1 "Hello Moon, Mars"
+let _ = commit b1 "Hello Moon, Mars"
 
 let _ = pull b2 b1
 
 let _ = pull b1 b2
 
-let _ = update b1 "Hello Moon Earth, Mars, etc."
+let _ = commit b1 "Hello Moon Earth, Mars, etc."
 
 let _ = pull b1 b2
 
 let _ = new_root "c" "A"
 
 let _ = fork "c" "ca1"
-let _ = update "ca1" "A1"
+let _ = commit "ca1" "A1"
 
 let _ = fork "c" "ca2"
-let _ = update "ca2" "A2"
+let _ = commit "ca2" "A2"
 
 let _ = fork "c" "cc1"
 let _ = pull "ca1" "cc1"

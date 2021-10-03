@@ -33,10 +33,19 @@ module Make (Data : DATA) : sig
   (** A reference to the database. *)
   type handle
   
-  (** [init name conn] creates a backed database, or returns an existing
-     one if the name is alreay used. Any errors thrown by the backing
-     database interface will be returned as an Error case of Result. *)
+  (** [init name conn] creates a backed database, or returns an
+     existing one if the name is alreay used.
+
+     Any errors thrown by the backing database interface will be
+     returned as an Error case of Result. *)
   val init : string -> Scylla.conn -> (handle, string) result
+
+  (** [fresh_init name conn] creates a backed database, removing the
+     tag store associated with any pre-existing database.
+
+     Any errors thrown by the backing database interface will be
+     returned as an Error case of Result. *)
+  val fresh_init : string -> Scylla.conn -> (handle, string) result
   
   (** [new_root h "b" d] creates a new branch "b" not related to any
      other, and gives the new branch an initial version with content
