@@ -11,4 +11,4 @@ with import ./default.nix;
 #   ];
 # }
 
-dbtest
+mergedb
