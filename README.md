@@ -13,7 +13,7 @@ Without `nix-shell`, the library should be installable with the following comman
 $ opam pin add scylla git@github.com:anmolsahoo25/ocaml-scylla
 ```
 
-[`ocaml-mrdt-v2`](https://github.com/anmolsahoo25/ocaml-mrdt-v2)
+[ocaml-mrdt-v2](https://github.com/anmolsahoo25/ocaml-mrdt-v2)
 
 # Demo
 
@@ -33,8 +33,6 @@ $ docker logs some-scylla | tail
 [Official guide to running Scylla in Docker](https://docs.scylladb.com/operating-scylla/procedures/tips/best_practices_scylla_on_docker/)
 
 Next, run the demo program.
-
-[ocaml-scylla](https://github.com/anmolsahoo25/ocaml-scylla)
 
 First, the `demo` program creates a content-addressed store and branch-tracking store, assigns several value versions to the branches, and merges the changes between them using fast-forward and 3-way merge.
 
