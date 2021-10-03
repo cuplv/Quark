@@ -55,7 +55,7 @@ The branches `ca1`, `ca2`, `cc1`, `cc2`, and `cc3` represent the five branches i
 
 The bottom of the `demo.ml` file is the script of forks, updates, and pulls that produces the above behavior.
 
-[dbtest.ml](./dbtest/dbtest.ml)
+[demo.ml](./src/demo.ml)
 
 # Code
 
