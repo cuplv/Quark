@@ -1,64 +1,46 @@
-type t
+(** Functions for manipulating version values. These do not manipulate
+   the version graph itself---that is handled by the VersionGraph
+   module. *)
+
 (** A unique version in a particular branch's history, which points to
    a particular content value by hash. *)
+type t
 
+(** Get the branch name of a version. *)
 val branch : t -> string
-(** Get the branch name of a version *)
 
+(** Get the content_id of a version. *)
 val content_id : t -> Content.id
-(** Get the content_id of a version *)
 
-val init : string -> Content.id -> t
 (** [init b c] creates a new version with branch name b and content c. *)
+val init : string -> Content.id -> t
 
-val bump : t -> Content.id -> t
 (** [bump v c] creates a successor version (with same branch name) to
    v, using c as the successor's content. *)
+val bump : t -> Content.id -> t
 
-val fork : string -> t -> t
 (** [fork new_branch from_v] creates an initial version for
    new_branch which has the same content as from_v. *)
+val fork : string -> t -> t
 
-val fastfwd : t -> t -> t
 (** [fastfwd from_v into_v] creates a successor to into_v with the
    same content as from_v. *)
+val fastfwd : t -> t -> t
 
-val merge : Util.mergefun -> t -> t -> t -> (t, string) result
 (** [merge f lca_v from_v into_v] creates a successor to into_v with
    the content created by applying the 3-way merge function f to the
    contents of lca_v, from_v, and into_v. *)
+val merge : Util.mergefun -> t -> t -> t -> (t, string) result
 
-
-val of_row : Scylla.Protocol.value array -> t
 (** Convert a database row (Blob, Int, Blob) into a version. *)
+val of_row : Scylla.Protocol.value array -> t
 
-val to_row : t -> Scylla.Protocol.value array
 (** Convert a version into a database row (Blob, Int, Blob). *)
+val to_row : t -> Scylla.Protocol.value array
 
-val compare : t -> t -> int
+(** Returns true if the first version is equal to the second or is a
+   later version on the same branch as the second. *)
+val succeeds_or_eq : t -> t -> bool
+
 (** Compare two versions. *)
-
-module Graph : sig
-  type handle
-  (** An open connection to a graph in a database. *)
-
-  val init : string -> Scylla.conn -> (handle, string) result
-  (** [init name conn] creates a database table using name, if it does
-     not already exist. *)
-
-  val add_version : handle -> t -> t list -> (unit, string) result
-  (** [add_version h v ps] adds v as a new vertex in the graph, using
-     existing vertexes ps as v's parents. *)
-
-  val parents : handle -> t -> (t list, string) result
-  (** [parents h v] gives a list of the direct parents of v in the
-     graph. *)
-
-  val is_ancestor : handle -> t -> t -> bool
-  (** [is_ancestor h v1 v2] checks whether v1 is an ancestor of v2. *)
-
-  val is_concurrent : handle -> t -> t -> bool
-  (** [is_concurrent h v1 v2] returns true when neither v1 nor v2 is an
-     ancestor of the other. *)
-
-end
+val compare : t -> t -> int

@@ -77,12 +77,12 @@ module Store = struct
   type t =
     { store_name : string;
       connection : conn;
-      version_graph : Version.Graph.handle
+      version_graph : VersionGraph.handle
     }
   type pull_error = Unrelated | Blocked of branch
   let init s conn =
     let* _ = query conn ~query:ks_query () in
-    let* graph = Version.Graph.init s conn in
+    let* graph = VersionGraph.init s conn in
     let* _ = query conn ~query:(create_bstore_query s) () in
     let* _ = query conn ~query:(create_lcastore_query s) () in
     Ok
@@ -173,10 +173,10 @@ module Store = struct
     = fun t b c ->
     let* old_version = get_head t b in
     let new_version = Version.bump old_version c in
-    let* _ = Version.Graph.add_version
-               t.version_graph
-               new_version
-               [old_version]
+    let _ = VersionGraph.add_version
+              t.version_graph
+              new_version
+              [old_version]
     in
     let* _ = update_head t new_version in
     Ok new_version
@@ -184,10 +184,10 @@ module Store = struct
     = fun t old_branch new_branch ->
     let* old_version = get_head t old_branch in
     let new_version = Version.fork new_branch old_version in
-    let* _ = Version.Graph.add_version
-               t.version_graph
-               new_version
-               [old_version]
+    let _ = VersionGraph.add_version
+              t.version_graph
+              new_version
+              [old_version]
     in
     let* _ = update_head t new_version in
     let* _ = update_lca t old_branch new_branch old_version in
@@ -215,7 +215,7 @@ module Store = struct
             branches" requirement. *)
          let r = List.find_opt
                    (fun (_,from_lca,into_lca) ->
-                     Version.Graph.is_concurrent
+                     VersionGraph.is_concurrent
                         t.version_graph
                         from_lca
                         into_lca)
@@ -239,7 +239,7 @@ module Store = struct
             (* Update the other branches' LCAs for into_b. *)
             let _ = List.map
                       (fun (other_b,from_lca,into_lca) ->
-                        if Version.Graph.is_ancestor
+                        if VersionGraph.is_ancestor
                              t.version_graph
                              into_lca
                              from_lca

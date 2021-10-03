@@ -28,7 +28,7 @@ let select_query s = Printf.sprintf
   s
 
 module Make (Stored : Content.STORABLE) = struct
-  type t = Util.table_handle
+  type handle = Util.table_handle
   let init s conn =
     let* _ = query conn ~query:ks_query () in
     let* _ = query conn ~query:(create_query s) () in

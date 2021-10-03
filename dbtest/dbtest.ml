@@ -1,6 +1,6 @@
 module Store = ContentStore.Make (StringData)
 module BS = BStore.Store
-module VS = Version.Graph
+module VS = VersionGraph
 
 open Util
 
