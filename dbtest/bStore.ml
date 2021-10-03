@@ -3,6 +3,7 @@ open Scylla.Protocol
 
 open Util
 
+type branch = Types.branch
 type version = Version.t
 
 let ks_query = Printf.sprintf
@@ -65,8 +66,6 @@ let get_lca_query s = Printf.sprintf
    where branch1 = ? and branch2 = ?"
   s
 
-type branch = string
-
 let get_branch_name v =
   Bigstringaf.to_string (get_blob v.(0))
 
@@ -77,51 +76,21 @@ module Store = struct
   type t =
     { store_name : string;
       connection : conn;
+      head_map : HeadMap.handle;
       version_graph : VersionGraph.handle
     }
   type pull_error = Unrelated | Blocked of branch
   let init s conn =
     let* _ = query conn ~query:ks_query () in
+    let* h = HeadMap.init s conn in
     let* graph = VersionGraph.init s conn in
-    let* _ = query conn ~query:(create_bstore_query s) () in
     let* _ = query conn ~query:(create_lcastore_query s) () in
     Ok
       { store_name = s;
         connection = conn;
+        head_map = h;
         version_graph = graph
       }
-  let list_branches t =
-    let r = query
-              t.connection
-              ~query:(list_query t.store_name)
-              ()
-          |> Result.get_ok
-    in
-    Array.to_list (Array.map get_branch_name r.values)
-  let update_head : t -> version -> (unit, string) result =
-    fun t v ->
-    let* _ = query
-               t.connection
-               ~query:(upsert_branch_query t.store_name)
-               ~values:(Version.to_row v)
-               ()
-    in
-    Ok ()
-  let get_head_opt : t -> branch -> (version option, string) result =
-    fun t b ->
-    let* r = query
-               t.connection
-               ~query:(get_head_query t.store_name)
-               ~values:[| Blob (big_of_string b) |]
-               ()
-    in
-    if Array.length r.values > 0
-    then Ok (Some (Version.of_row r.values.(0)))
-    else Ok None
-  let get_head : t -> branch -> (version, string) result =
-    fun t b ->
-    let* o = get_head_opt t b in
-    Ok (Option.get o)
   let update_lca : t -> branch -> branch -> version -> (unit, string) result
     = fun t n1 n2 lca ->
     let (b1,b2) = order_branches n1 n2 in
@@ -158,7 +127,7 @@ module Store = struct
     (* Get other branches *)
     let other_bs = List.filter
                      (fun b -> b <> b1 && b <> b2)
-                     (list_branches t)
+                     (HeadMap.list_branches t.head_map)
     in
     (* Get tuples (other_branch, lca_with_from, lca_with_into) *)
     List.fold_right
@@ -169,27 +138,26 @@ module Store = struct
                    | _ -> ls)
       other_bs
       []
-  let commit : t -> branch -> Content.id -> (version, string) result
+  let commit : t -> branch -> Content.id -> unit option
     = fun t b c ->
-    let* old_version = get_head t b in
+    let@+ old_version = HeadMap.get t.head_map b in
     let new_version = Version.bump old_version c in
     let _ = VersionGraph.add_version
               t.version_graph
               new_version
               [old_version]
     in
-    let* _ = update_head t new_version in
-    Ok new_version
+    HeadMap.set t.head_map new_version
   let fork : t -> branch -> branch -> (version, string) result
     = fun t old_branch new_branch ->
-    let* old_version = get_head t old_branch in
+    let old_version = HeadMap.get t.head_map old_branch |> Option.get in
     let new_version = Version.fork new_branch old_version in
     let _ = VersionGraph.add_version
               t.version_graph
               new_version
               [old_version]
     in
-    let* _ = update_head t new_version in
+    let _ = HeadMap.set t.head_map new_version in
     let* _ = update_lca t old_branch new_branch old_version in
     let _ = List.iter
               (fun (b,lca,_) -> update_lca t b new_branch lca
@@ -199,8 +167,8 @@ module Store = struct
     Ok new_version
   let pull : mergefun -> t -> branch -> branch -> ((unit, pull_error) result, string) result
     = fun mergefun t from_b into_b ->
-    let* into_v = get_head t into_b in
-    let* from_v = get_head t from_b in
+    let into_v = HeadMap.get t.head_map into_b |> Option.get in
+    let from_v = HeadMap.get t.head_map from_b |> Option.get in
     let* lca = get_lca t from_b into_b in
     match lca with
     | None -> Ok (Result.Error Unrelated)
@@ -232,7 +200,7 @@ module Store = struct
                              |> Result.get_ok
             in
             (* Update head of into_b to the new version. *)
-            let* _ = update_head t new_v in
+            let _ = HeadMap.set t.head_map new_v in
             (* Update LCA between from_b and into_b, using from_b's head
                as LCA version. *)
             let* _ = update_lca t from_b into_b from_v in
@@ -253,4 +221,10 @@ module Store = struct
          | Some (b,_,_) ->
             (* No database errors, but update was blocked due to this other branch. *)
             Ok (Error (Blocked b))
+  let read : t -> branch -> Content.id option
+    = fun t name ->
+    Option.map Version.content_id (HeadMap.get t.head_map name)
+  let new_root : t -> branch -> Content.id -> unit
+    = fun t name c ->
+    HeadMap.set t.head_map (Version.init name c)
 end

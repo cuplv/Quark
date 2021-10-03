@@ -12,7 +12,8 @@ val branch : t -> string
 (** Get the content_id of a version. *)
 val content_id : t -> Content.id
 
-(** [init b c] creates a new version with branch name b and content c. *)
+(** [init b c] creates a new version with branch name b and content c,
+   which is not a successor to any other version. *)
 val init : string -> Content.id -> t
 
 (** [bump v c] creates a successor version (with same branch name) to

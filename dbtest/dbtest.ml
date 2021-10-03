@@ -2,8 +2,6 @@ module Store = ContentStore.Make (StringData)
 module BS = BStore.Store
 module VS = VersionGraph
 
-open Util
-
 let earth = "Earth"
 
 let moon = "Moon"
@@ -63,22 +61,33 @@ let str_merge lca v1 v2 =
     Ok v2
 
 let latest b =
-  let* k = BS.get_head bs b in
-  Ok (find (Version.content_id k) |> Option.get)
+  let c = BS.read bs b |> Option.get in
+  Ok (find c |> Option.get)
+
+let new_root b s =
+  let c = store s in
+  let _ = BS.new_root bs b c in
+  let () = Printf.printf "Created root branch %s with value \"%s\".\n"
+             b
+             (latest b |> Result.get_ok)
+  in
+  Ok ()
 
 let update b s =
   let k = store s in
-  let o = BS.get_head_opt bs b |> Result.get_ok in
-  match o with
-  | Some _ ->
-      BS.commit bs b k
-  | None ->
-     let _ = BS.update_head bs (Version.init b k) in
-     let () = Printf.printf "Created branch %s with value \"%s\".\n"
+  match BS.commit bs b k with
+  | Some () ->
+     let () = Printf.printf "Updated branch %s to value \"%s\".\n"
                 b
-                (latest b |> Result.get_ok)
+                (BS.read bs b |> Option.get |> find |> Option.get)
      in
-     Ok (Version.init b k)
+     Some ()
+  | None ->
+     let () = Printf.printf
+                "Update failed. Branch %s does not exist.\n"
+                b
+     in
+     None
 
 let fork b1 b2 =
   let r = BS.fork bs b1 b2 in
@@ -104,9 +113,9 @@ let pull from_b into_b =
 let b1 = "b1"
 let b2 = "b2"
 
-let _ = update b1 "Hello" |> Result.get_ok
+let _ = new_root b1 "Hello"
 
-let _ = fork b1 b2 |> Result.get_ok
+let _ = fork b1 b2
 
 let _ = update b2 "Hello Earth"
 
@@ -124,7 +133,7 @@ let _ = update b1 "Hello Moon Earth, Mars, etc."
 
 let _ = pull b1 b2
 
-let _ = update "c" "A"
+let _ = new_root "c" "A"
 
 let _ = fork "c" "ca1"
 let _ = update "ca1" "A1"
