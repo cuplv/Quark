@@ -5,26 +5,27 @@ type version = Version.t
 
 type pull_error = Unrelated | Blocked of branch
 
-module type DATA = sig
-  type t
-  val merge3 : t -> t -> t -> t
-  include Content.STORABLE with type data = t
-end
+module Make (Data : Content.TYPE) = struct
 
-module Make (Data : DATA) = struct
   module CStore = ContentStore.Make(Data)
+
   type handle =
     { head_map : HeadMap.handle;
       lca_map : LcaMap.handle;
       version_graph : VersionGraph.handle;
       content_store : CStore.handle
     }
+
   let get_head t = HeadMap.get t.head_map
   let set_head t = HeadMap.set t.head_map
   let get_lca t = LcaMap.get t.lca_map
   let set_lca t = LcaMap.set t.lca_map
   let get_cs t = CStore.get t.content_store
   let put_cs t = CStore.put t.content_store
+  let of_adt t = Data.to_t t.content_store
+  let to_adt t = Data.to_o t.content_store
+  let merge3 t = Data.merge t.content_store
+
   let init s conn =
     let* _ = KeySpace.create_tag_ks conn in
     let* _ = KeySpace.create_content_ks conn in
@@ -79,10 +80,12 @@ module Make (Data : DATA) = struct
                       exit 1)
       other_bs
       []
-  let commit : handle -> branch -> Data.t -> unit option
+
+  let commit : handle -> branch -> Data.o -> unit option
     = fun t b d ->
     let@+ old_version = HeadMap.get t.head_map b in
-    let hash = put_cs t d in
+    let d_t = of_adt t d in
+    let hash = put_cs t d_t in
     let new_version = Version.bump old_version hash in
     let _ = VersionGraph.add_version
               t.version_graph
@@ -90,6 +93,7 @@ module Make (Data : DATA) = struct
               [old_version]
     in
     HeadMap.set t.head_map new_version
+
   let fork : handle -> branch -> branch -> branch option
     = fun t old_branch new_branch ->
     let@+ old_version = HeadMap.get t.head_map old_branch in
@@ -97,8 +101,7 @@ module Make (Data : DATA) = struct
     let _ = VersionGraph.add_version
               t.version_graph
               new_version
-              [old_version]
-    in
+              [old_version] in
     let _ = set_lca t old_branch new_branch old_version in
     let _ = Printf.printf "LCAs with: " in
     let _ = List.iter (fun (b,_) -> Printf.printf "%s, " b) (all_lcas_of t old_branch) in
@@ -110,14 +113,14 @@ module Make (Data : DATA) = struct
     let _ = HeadMap.set t.head_map new_version in
     new_branch
 
-  (** Merge versions by applying the merge3 function to their
+  (** Merge versions by applying the Data.merge function to their
      content. *)
   let merge : handle -> version -> version -> version -> version
     = fun t lca_v from_v into_v ->
     let lca_d = get_cs t (Version.content_id lca_v) |> Option.get in
     let from_d = get_cs t (Version.content_id from_v) |> Option.get in
     let into_d = get_cs t (Version.content_id into_v) |> Option.get in
-    let new_d = Data.merge3 lca_d from_d into_d in
+    let new_d = merge3 t lca_d from_d into_d in
     let new_c = put_cs t new_d in
     Version.bump into_v new_c
 
@@ -178,13 +181,17 @@ module Make (Data : DATA) = struct
          | Some (b,_,_) ->
             (* Update was blocked due to this other branch. *)
             Error (Blocked b)
-  let read : handle -> branch -> Data.t option
+
+  let read : handle -> branch -> Data.o option
     = fun t name ->
     let@+ v = get_head t name in
-    get_cs t (Version.content_id v) |> Option.get
-  let new_root : handle -> branch -> Data.t -> unit
+    let d_t = get_cs t (Version.content_id v) |> Option.get in
+    to_adt t d_t
+
+  let new_root : handle -> branch -> Data.o -> unit
     = fun t name d ->
-    let hash = put_cs t d in
+    let d_t = of_adt t d in
+    let hash = put_cs t d_t in
     set_head t (Version.init name hash)
 
   let debug_dump t =

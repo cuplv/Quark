@@ -7,7 +7,7 @@ let create_tag_ks_query = Printf.sprintf
    'replication_factor':1};"
 
 let drop_tag_ks_query = Printf.sprintf
-  "drop keyspace tag"
+  "drop keyspace if exists tag"
 
 let create_content_ks_query = Printf.sprintf
   "create keyspace if not exists content
@@ -16,7 +16,7 @@ let create_content_ks_query = Printf.sprintf
    'replication_factor':1};"
 
 let drop_content_ks_query = Printf.sprintf
-  "drop keyspace content"
+  "drop keyspace if exists content"
 
 let create_tag_ks conn =
   let* _ = Scylla.query conn ~query:create_tag_ks_query ()

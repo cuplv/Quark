@@ -36,25 +36,27 @@ let fork new_branch v = init new_branch (content_id v)
 
 let fastfwd from_v into_v = bump into_v (content_id from_v)
 
+(*
 let merge f lca_v from_v into_v =
   let* new_cid = f lca_v.content_id
                    from_v.content_id
                    into_v.content_id
   in
   Ok (bump into_v new_cid)
+*)
 
 let of_row : value array -> t =
   fun row ->
   { branch = get_string row.(0);
     version_num = get_int row.(1);
-    content_id = get_string row.(2);
+    content_id = Hash.from_string @@ get_string row.(2);
   }
 
 let to_row : t -> value array =
   fun v ->
   [| Blob (big_of_string v.branch);
      Int (Int32.of_int v.version_num);
-     Blob (big_of_string v.content_id)
+     Blob (Hash.big_string v.content_id)
   |]
 
 let compare : t -> t -> int =
@@ -63,6 +65,8 @@ let compare : t -> t -> int =
   if bc = 0
   then let vc = Int.compare v1.version_num v2.version_num in
        if vc = 0
-       then String.compare v1.content_id v2.content_id
+       then String.compare 
+            (Hash.string v1.content_id) 
+            (Hash.string v2.content_id)
        else vc
   else bc

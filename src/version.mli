@@ -34,7 +34,7 @@ val fastfwd : t -> t -> t
 (** [merge f lca_v from_v into_v] creates a successor to into_v with
    the content created by applying the 3-way merge function f to the
    contents of lca_v, from_v, and into_v. *)
-val merge : Util.mergefun -> t -> t -> t -> (t, string) result
+(* val merge : Util.mergefun -> t -> t -> t -> (t, string) result*)
 
 (** Convert a database row (Blob, Int, Blob) into a version. *)
 val of_row : Scylla.Protocol.value array -> t
@@ -46,5 +46,5 @@ val to_row : t -> Scylla.Protocol.value array
    later version on the same branch as the second. *)
 val succeeds_or_eq : t -> t -> bool
 
-(** Compare two versions. *)
+(** Compare two versions. Needed for Version.t Set.t *)
 val compare : t -> t -> int
