@@ -1,4 +1,5 @@
 open Util
+open System
 
 type branch = Types.branch
 type version = Version.t
@@ -9,47 +10,32 @@ module Make (Data : Content.TYPE) = struct
 
   module CStore = ContentStore.Make(Data)
 
-  type handle =
-    { head_map : HeadMap.handle;
-      lca_map : LcaMap.handle;
-      version_graph : VersionGraph.handle;
-      content_store : CStore.handle
-    }
+  let get_head t = HeadMap.get t
+  let set_head t = HeadMap.set t
+  let get_lca t = LcaMap.get t
+  let set_lca t = LcaMap.set t
+  let get_cs t = CStore.get t
+  let put_cs t = CStore.put t
 
-  let get_head t = HeadMap.get t.head_map
-  let set_head t = HeadMap.set t.head_map
-  let get_lca t = LcaMap.get t.lca_map
-  let set_lca t = LcaMap.set t.lca_map
-  let get_cs t = CStore.get t.content_store
-  let put_cs t = CStore.put t.content_store
-  let of_adt t = Data.to_t t.content_store
-  let to_adt t = Data.to_o t.content_store
-  let merge3 t = Data.merge t.content_store
-
-  let init s conn =
+  let init {store_name=s;connection=conn} =
     let* _ = KeySpace.create_tag_ks conn in
     let* _ = KeySpace.create_content_ks conn in
-    let* cs = CStore.init s conn in
-    let* h = HeadMap.init s conn in
-    let* l = LcaMap.init s conn in
-    let* graph = VersionGraph.init s conn in
-    Ok
-      { head_map = h;
-        lca_map = l;
-        version_graph = graph;
-        content_store = cs
-      }
+    let* _ = CStore.init s conn in
+    let* _ = HeadMap.init s conn in
+    let* _ = LcaMap.init s conn in
+    let* _ = VersionGraph.init s conn in
+    Ok ()
 
-  let fresh_init s conn =
-    let* _ = KeySpace.delete_tag_ks conn in
-    init s conn
+  let fresh_init db =
+    let* _ = KeySpace.delete_tag_ks db.connection in
+    init db
 
   (** Get LCAs for the given branch with other related branches. *)
-  let all_lcas_of : handle -> branch -> (branch * version) list
+  let all_lcas_of : System.db -> branch -> (branch * version) list
     = fun t b ->
     let other_bs = List.filter
                      (fun b' -> b <> b')
-                     (HeadMap.list_branches t.head_map)
+                     (HeadMap.list_branches t)
     in
     List.fold_right (fun b' ls -> match get_lca t b b' with
                                   | Some lca -> (b',lca) :: ls
@@ -58,12 +44,12 @@ module Make (Data : Content.TYPE) = struct
       []
 
   (** Get LCA pairs for the two given branches with other related branches. *)
-  let all_lcas_of2 : handle -> branch -> branch -> (branch * version * version) list
+  let all_lcas_of2 : System.db -> branch -> branch -> (branch * version * version) list
     = fun t b1 b2 ->
     (* Get other branches *)
     let other_bs = List.filter
                      (fun b' -> b' <> b1 && b' <> b2)
-                     (HeadMap.list_branches t.head_map)
+                     (HeadMap.list_branches t)
     in
     (* Get tuples (other_branch, lca_with_from, lca_with_into) *)
     List.fold_right
@@ -81,27 +67,23 @@ module Make (Data : Content.TYPE) = struct
       other_bs
       []
 
-  let commit : handle -> branch -> Data.o -> unit option
+  let commit : System.db -> branch -> Data.o -> unit option
     = fun t b d ->
-    let@+ old_version = HeadMap.get t.head_map b in
-    let d_t = of_adt t d in
+    let@+ old_version = HeadMap.get t b in
+    let d_t = Data.of_adt d in
     let hash = put_cs t d_t in
     let new_version = Version.bump old_version hash in
     let _ = VersionGraph.add_version
-              t.version_graph
-              new_version
-              [old_version]
+              t new_version [old_version]
     in
-    HeadMap.set t.head_map new_version
+    HeadMap.set t new_version
 
-  let fork : handle -> branch -> branch -> branch option
+  let fork : System.db -> branch -> branch -> branch option
     = fun t old_branch new_branch ->
-    let@+ old_version = HeadMap.get t.head_map old_branch in
+    let@+ old_version = HeadMap.get t old_branch in
     let new_version = Version.fork new_branch old_version in
     let _ = VersionGraph.add_version
-              t.version_graph
-              new_version
-              [old_version] in
+              t new_version [old_version] in
     let _ = set_lca t old_branch new_branch old_version in
     let _ = Printf.printf "LCAs with: " in
     let _ = List.iter (fun (b,_) -> Printf.printf "%s, " b) (all_lcas_of t old_branch) in
@@ -110,24 +92,24 @@ module Make (Data : Content.TYPE) = struct
               (fun (b',lca) -> set_lca t b' new_branch lca)
               (all_lcas_of t old_branch)
     in
-    let _ = HeadMap.set t.head_map new_version in
+    let _ = HeadMap.set t new_version in
     new_branch
 
   (** Merge versions by applying the Data.merge function to their
      content. *)
-  let merge : handle -> version -> version -> version -> version
+  let merge : System.db -> version -> version -> version -> version
     = fun t lca_v from_v into_v ->
     let lca_d = get_cs t (Version.content_id lca_v) |> Option.get in
     let from_d = get_cs t (Version.content_id from_v) |> Option.get in
     let into_d = get_cs t (Version.content_id into_v) |> Option.get in
-    let new_d = merge3 t lca_d from_d into_d in
+    let new_d = Data.merge lca_d from_d into_d in
     let new_c = put_cs t new_d in
     Version.bump into_v new_c
 
-  let pull : handle -> branch -> branch -> (unit, pull_error) result
+  let pull : System.db -> branch -> branch -> (unit, pull_error) result
     = fun t from_b into_b ->
-    let into_v = HeadMap.get t.head_map into_b |> Option.get in
-    let from_v = HeadMap.get t.head_map from_b |> Option.get in
+    let into_v = HeadMap.get t into_b |> Option.get in
+    let from_v = HeadMap.get t from_b |> Option.get in
     let lca_o = get_lca t from_b into_b in
     match lca_o with
     | None -> Result.Error Unrelated
@@ -143,9 +125,7 @@ module Make (Data : Content.TYPE) = struct
          let r = List.find_opt
                    (fun (_,from_lca,into_lca) ->
                      VersionGraph.is_concurrent
-                        t.version_graph
-                        from_lca
-                        into_lca)
+                        t from_lca into_lca)
                    other_lcas
          in
          match r with
@@ -161,7 +141,7 @@ module Make (Data : Content.TYPE) = struct
               else merge t lca_v from_v into_v
             in
             (* Update head of into_b to the new version. *)
-            let _ = HeadMap.set t.head_map new_v in
+            let _ = HeadMap.set t new_v in
             (* Update LCA between from_b and into_b, using from_b's head
                as LCA version. *)
             let _ = set_lca t from_b into_b from_v in
@@ -169,9 +149,7 @@ module Make (Data : Content.TYPE) = struct
             let _ = List.map
                       (fun (other_b,from_lca,into_lca) ->
                         if VersionGraph.is_ancestor
-                             t.version_graph
-                             into_lca
-                             from_lca
+                             t into_lca from_lca
                         then set_lca t into_b other_b from_lca
                         else ())
                       other_lcas
@@ -182,24 +160,24 @@ module Make (Data : Content.TYPE) = struct
             (* Update was blocked due to this other branch. *)
             Error (Blocked b)
 
-  let read : handle -> branch -> Data.o option
+  let read : System.db -> branch -> Data.o option
     = fun t name ->
     let@+ v = get_head t name in
     let d_t = get_cs t (Version.content_id v) |> Option.get in
-    to_adt t d_t
+    Data.to_adt d_t
 
-  let new_root : handle -> branch -> Data.o -> unit
+  let new_root : System.db -> branch -> Data.o -> unit
     = fun t name d ->
-    let d_t = of_adt t d in
+    let d_t = Data.of_adt d in
     let hash = put_cs t d_t in
     set_head t (Version.init name hash)
 
   let debug_dump t =
-    let () = VersionGraph.debug_dump t.version_graph in
+    let () = VersionGraph.debug_dump t in
     let () = Printf.printf "\n" in
-    let () = LcaMap.debug_dump t.lca_map in
+    let () = LcaMap.debug_dump t in
     let () = Printf.printf "\n" in
     let () = Printf.printf "Branches:\n" in
-    let () = List.iter (fun b -> Printf.printf "%s, " b) (HeadMap.list_branches t.head_map) in
+    let () = List.iter (fun b -> Printf.printf "%s, " b) (HeadMap.list_branches t) in
     Printf.printf "\n"
 end

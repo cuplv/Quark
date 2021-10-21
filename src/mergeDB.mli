@@ -14,26 +14,23 @@ type pull_error = Unrelated | Blocked of branch
 
 module Make (Data : Content.TYPE) : sig
 
-  (** A reference to the database. *)
-  type handle
-  
   (** [init name conn] creates a backed database, or returns an
      existing one if the name is alreay used.
 
      Any errors thrown by the backing database interface will be
      returned as an Error case of Result. *)
-  val init : string -> Scylla.conn -> (handle, string) result
+  val init : System.db -> (unit, string) result
 
   (** [fresh_init name conn] creates a backed database, removing the
      tag store associated with any pre-existing database.
 
      Any errors thrown by the backing database interface will be
      returned as an Error case of Result. *)
-  val fresh_init : string -> Scylla.conn -> (handle, string) result
+  val fresh_init : System.db -> (unit, string) result
   
   (** [commit h "b" d] commits a new version on branch "b" with
      content d, or returns None if "b" did not exist. *)
-  val commit : handle -> branch -> Data.o -> unit option
+  val commit : System.db -> branch -> Data.o -> unit option
   
   (** [fork h "old" "new"] creates branch "new" as a fork of "old",
      returning Some ("new"). If branch "old" did not exist, None is
@@ -41,7 +38,7 @@ module Make (Data : Content.TYPE) : sig
   
      WARNING: if a branch with the name "new" already exists, other
      branches related to the old "new" will become confused. *)
-  val fork : handle -> branch -> branch -> branch option
+  val fork : System.db -> branch -> branch -> branch option
   
   (** [new_root h "b" d] creates a new branch "b" not related to any
      other, and gives the new branch an initial version with content
@@ -49,11 +46,11 @@ module Make (Data : Content.TYPE) : sig
   
      WARNING: if a branch with the name "b" already exists, other
      branches related to the old "b" will become confused. *)
-  val new_root : handle -> branch -> Data.o -> unit
+  val new_root : System.db -> branch -> Data.o -> unit
   
   (** Get the latest value of the branch, or return None if the branch
      does not exist. *)
-  val read : handle -> branch -> Data.o option
+  val read : System.db -> branch -> Data.o option
   
   (** [pull h "from" "into"] updates branch "into" with the latest
      version of branch "from", using either a fast-forward or merge as
@@ -61,8 +58,8 @@ module Make (Data : Content.TYPE) : sig
   
      If this pull fails, a pull_error is returned indicating the
      reason. *)
-  val pull : handle -> branch -> branch -> (unit, pull_error) result
+  val pull : System.db -> branch -> branch -> (unit, pull_error) result
 
   (** Print information from the database tables for debugging. *)
-  val debug_dump : handle -> unit
+  val debug_dump : System.db -> unit
 end

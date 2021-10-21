@@ -2,9 +2,9 @@ open Scylla
 open Scylla.Protocol
 
 open Util
+open System
 
 type branch = Types.branch
-type handle = table_handle
 
 let create_lcastore_query s = Printf.sprintf
   "create table if not exists tag.%s_lca(
@@ -45,7 +45,7 @@ let order_branches : branch -> branch -> branch * branch =
 
 let init s conn =
   let* _ = query conn ~query:(create_lcastore_query s) () in
-  Ok { store_name = s; connection = conn }
+  Ok ()
 
 let set t n1 n2 lca =
   let (b1,b2) = order_branches n1 n2 in

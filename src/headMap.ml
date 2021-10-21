@@ -2,6 +2,7 @@ open Scylla
 open Scylla.Protocol
 
 open Util
+open System
 
 type branch = Types.branch
 
@@ -32,11 +33,9 @@ let get_head_query s = Printf.sprintf
    where branch = ?"
   s
 
-type handle = table_handle
-
 let init s conn =
   let* _ = query conn ~query:(create_headmap_query s) () in
-  Ok { store_name = s; connection = conn }
+  Ok ()
 
 let list_branches t =
     let r = query

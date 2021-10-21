@@ -1,14 +1,17 @@
 
 
-module Ilist = Ilist.Make(SInt)
-module DB = MergeDB.Make(Ilist)
-
 let conn = Scylla.connect ~ip:"127.0.0.1" ~port:9042 |> Result.get_ok
 
 let () = Printf.printf "Opened connection.\n"
 
-let db =
-  match DB.fresh_init "my_store" conn with
+let db = System.make_db "my_store" conn
+
+module Ilist = Ilist.Make(SInt)(struct let db=db end)
+module DB = MergeDB.Make(Ilist)
+
+
+let () =
+  match DB.fresh_init db with
   | Ok s -> s
   | Error e -> let () = Printf.printf "%s" e in exit 1
 

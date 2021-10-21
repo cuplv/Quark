@@ -9,19 +9,19 @@ type t
 (** Get the branch name of a version. *)
 val branch : t -> string
 
-(** Get the content_id of a version. *)
-val content_id : t -> Content.id
+(** Get the hash associated with a version. *)
+val content_id : t -> Hash.t
 
 (** Get the version_num of a version. *)
 val version_num : t -> int
 
-(** [init b c] creates a new version with branch name b and content c,
-   which is not a successor to any other version. *)
-val init : string -> Content.id -> t
+(** [init b c] creates a new branch named b with head pointing to a new
+ * version with content (hash) as c. *)
+val init : string -> Hash.t -> t
 
 (** [bump v c] creates a successor version (with same branch name) to
    v, using c as the successor's content. *)
-val bump : t -> Content.id -> t
+val bump : t -> Hash.t -> t
 
 (** [fork new_branch from_v] creates an initial version for
    new_branch which has the same content as from_v. *)

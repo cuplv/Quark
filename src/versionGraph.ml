@@ -1,4 +1,5 @@
 open Util
+open System
 
 let query = Scylla.query
 
@@ -47,13 +48,13 @@ let debug_query s = Printf.sprintf
    from tag.%s_version_graph"
   s
 
-type handle = table_handle
 
-let init : string -> Scylla.conn -> (handle, string) result =
+let init : string -> Scylla.conn -> (unit, string) result =
   fun s conn ->
   let* _ = query conn ~query:(create_graph_query s) () in
-  Ok { store_name = s; connection = conn }
-let parents : handle -> Version.t -> Version.t list =
+  Ok ()
+
+let parents : System.db -> Version.t -> Version.t list =
   fun th v ->
   let r = query
             th.connection
@@ -64,7 +65,8 @@ let parents : handle -> Version.t -> Version.t list =
   in
   let f row ls = Version.of_row row :: ls in
   Array.fold_right f r.values []
-let rec add_version : handle -> Version.t -> Version.t list -> unit =
+
+let rec add_version : System.db -> Version.t -> Version.t list -> unit =
   fun th child parents ->
   match parents with
   | [] -> ()
@@ -79,7 +81,8 @@ let rec add_version : handle -> Version.t -> Version.t list -> unit =
              |> Result.get_ok
      in
      add_version th child ps
-let rec hunt_for : handle -> Version.t list -> Version.t -> bool =
+
+let rec hunt_for : System.db -> Version.t list -> Version.t -> bool =
   fun th vs v ->
   (* let _ = Printf.printf "Hunt for\n" in
    * let _ = List.iter (fun v -> Printf.printf "%s:%d " v.branch v.version_num) vs in
@@ -96,8 +99,10 @@ let rec hunt_for : handle -> Version.t list -> Version.t -> bool =
               let vs'' = VSet.elements (VSet.of_list vs') in
               (* Continue search breadth-first. *)
               hunt_for th vs'' v
+
 let is_ancestor th v1 v2 =
   hunt_for th (parents th v2) v1
+
 let is_concurrent th v1 v2 =
   not (v1 = v2 || is_ancestor th v1 v2 || is_ancestor th v2 v1)
 

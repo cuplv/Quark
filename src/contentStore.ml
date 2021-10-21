@@ -2,6 +2,7 @@ open Scylla
 open Scylla.Protocol (* Defines Scylla store value types *)
 
 open Util
+open System
 
 let ks_query = Printf.sprintf
   "create keyspace if not exists content
@@ -29,7 +30,6 @@ let select_query s =
   qry
 
 module Make (Stored : Content.SERIALIZABLE) = struct
-  type handle = Util.table_handle
 
   let to_json_string = Irmin.Type.to_json_string Stored.t
   let of_json_string = Irmin.Type.of_json_string Stored.t
@@ -38,7 +38,7 @@ module Make (Stored : Content.SERIALIZABLE) = struct
   let init s conn =
     let* _ = query conn ~query:ks_query () in
     let* _ = query conn ~query:(create_query s) () in
-    Ok { store_name = s; connection = conn }
+    Ok () 
     
   let put t v =
     let json = big_of_string @@ to_json_string v in
