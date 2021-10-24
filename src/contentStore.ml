@@ -40,7 +40,7 @@ module Make (Stored : Content.SERIALIZABLE) = struct
     let* _ = query conn ~query:(create_query s) () in
     Ok () 
     
-  let put t v =
+  let put db v =
     let json = big_of_string @@ to_json_string v in
     let hash = Hash.digest_big_string json in
     let kb = Blob (Hash.big_string hash) in
@@ -48,21 +48,23 @@ module Make (Stored : Content.SERIALIZABLE) = struct
     let _ = Printf.printf "putting %s\n" @@ Scylla.show_value kb in *)
     let vb = Blob json in
     let _ = query
-              t.connection
-              ~query:(insert_query t.store_name)
+              db.connection
+              ~query:(insert_query db.store_name)
               ~values:[|kb;vb|]
+              ~consistency: db.consistency
               ()
             |> Result.get_ok in
     hash
 
-  let get t hash =
+  let get db hash =
     let kb = Blob (Hash.big_string hash) in
     (*let _ = Printf.printf "hash: %s\n" @@ Hash.string hash in
     let _ = Printf.printf "key:%s\n" @@ Scylla.show_value kb in*)
     let v = query
-              t.connection
-              ~query:(select_query t.store_name)
+              db.connection
+              ~query:(select_query db.store_name)
               ~values:[|kb|]
+              ~consistency: db.consistency
               ()
             |> Result.get_ok
     in

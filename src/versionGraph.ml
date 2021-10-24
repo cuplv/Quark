@@ -55,11 +55,12 @@ let init : string -> Scylla.conn -> (unit, string) result =
   Ok ()
 
 let parents : System.db -> Version.t -> Version.t list =
-  fun th v ->
+  fun db v ->
   let r = query
-            th.connection
-            ~query:(parents_query th.store_name)
+            db.connection
+            ~query:(parents_query db.store_name)
             ~values:(Array.sub (Version.to_row v) 0 2)
+            ~consistency: db.consistency
             ()
           |> Result.get_ok
   in
@@ -67,23 +68,24 @@ let parents : System.db -> Version.t -> Version.t list =
   Array.fold_right f r.values []
 
 let rec add_version : System.db -> Version.t -> Version.t list -> unit =
-  fun th child parents ->
+  fun db child parents ->
   match parents with
   | [] -> ()
   | p::ps ->
      let _ = query
-               th.connection
-               ~query:(add_query th.store_name)
+               db.connection
+               ~query:(add_query db.store_name)
                ~values:(Array.append
                           (Version.to_row child)
                           (Version.to_row p))
+               ~consistency: db.consistency
                ()
              |> Result.get_ok
      in
-     add_version th child ps
+     add_version db child ps
 
 let rec hunt_for : System.db -> Version.t list -> Version.t -> bool =
-  fun th vs v ->
+  fun db vs v ->
   (* let _ = Printf.printf "Hunt for\n" in
    * let _ = List.iter (fun v -> Printf.printf "%s:%d " v.branch v.version_num) vs in
    * let _ = Printf.printf "\n" in *)
@@ -92,24 +94,24 @@ let rec hunt_for : System.db -> Version.t list -> Version.t -> bool =
   | _ -> if List.exists (Version.succeeds_or_eq v) vs
          then true
          else let vs' = List.concat_map
-                          (fun c -> parents th c)
+                          (fun c -> parents db c)
                           vs
               in
               (* Remove duplicates. *)
               let vs'' = VSet.elements (VSet.of_list vs') in
               (* Continue search breadth-first. *)
-              hunt_for th vs'' v
+              hunt_for db vs'' v
 
-let is_ancestor th v1 v2 =
-  hunt_for th (parents th v2) v1
+let is_ancestor db v1 v2 =
+  hunt_for db (parents db v2) v1
 
-let is_concurrent th v1 v2 =
-  not (v1 = v2 || is_ancestor th v1 v2 || is_ancestor th v2 v1)
+let is_concurrent db v1 v2 =
+  not (v1 = v2 || is_ancestor db v1 v2 || is_ancestor db v2 v1)
 
-let debug_dump th =
+let debug_dump db =
   let r = query
-            th.connection
-            ~query:(debug_query th.store_name)
+            db.connection
+            ~query:(debug_query db.store_name)
             ()
           |> Result.get_ok
   in

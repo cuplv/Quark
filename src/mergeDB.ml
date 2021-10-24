@@ -17,7 +17,7 @@ module Make (Data : Content.TYPE) = struct
   let get_cs t = CStore.get t
   let put_cs t = CStore.put t
 
-  let init {store_name=s;connection=conn} =
+  let init {store_name=s;connection=conn; _} =
     let* _ = KeySpace.create_tag_ks conn in
     let* _ = KeySpace.create_content_ks conn in
     let* _ = CStore.init s conn in

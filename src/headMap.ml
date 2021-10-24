@@ -37,30 +37,33 @@ let init s conn =
   let* _ = query conn ~query:(create_headmap_query s) () in
   Ok ()
 
-let list_branches t =
+let list_branches db =
     let r = query
-              t.connection
-              ~query:(list_query t.store_name)
+              db.connection
+              ~query:(list_query db.store_name)
+              ~consistency: db.consistency
               ()
           |> Result.get_ok
     in
     Array.to_list (Array.map (fun row -> get_string row.(0)) r.values)
 
-let set t v =
+let set db v =
   let _ = query
-            t.connection
-            ~query:(upsert_head_query t.store_name)
+            db.connection
+            ~query:(upsert_head_query db.store_name)
             ~values:(Version.to_row v)
+            ~consistency: db.consistency
             ()
           |> Result.get_ok
   in
   ()
 
-let get t name =
+let get db name =
   let r = query
-            t.connection
-            ~query:(get_head_query t.store_name)
+            db.connection
+            ~query:(get_head_query db.store_name)
             ~values:[| Blob (big_of_string name) |]
+            ~consistency: db.consistency
             ()
           |> Result.get_ok
   in
