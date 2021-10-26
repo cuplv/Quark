@@ -24,6 +24,7 @@ module Make (Data : Content.TYPE) = struct
     let* _ = HeadMap.init s conn in
     let* _ = LcaMap.init s conn in
     let* _ = VersionGraph.init s conn in
+    let* _ = GlobalLock.init s conn in
     Ok ()
 
   let fresh_init db =
@@ -32,12 +33,12 @@ module Make (Data : Content.TYPE) = struct
 
   (** Get LCAs for the given branch with other related branches. *)
   let all_lcas_of : System.db -> branch -> (branch * version) list
-    = fun t b ->
+    = fun db b ->
     let other_bs = List.filter
                      (fun b' -> b <> b')
-                     (HeadMap.list_branches t)
+                     (HeadMap.list_branches db)
     in
-    List.fold_right (fun b' ls -> match get_lca t b b' with
+    List.fold_right (fun b' ls -> match get_lca db b b' with
                                   | Some lca -> (b',lca) :: ls
                                   | None -> ls)
       other_bs
@@ -45,15 +46,15 @@ module Make (Data : Content.TYPE) = struct
 
   (** Get LCA pairs for the two given branches with other related branches. *)
   let all_lcas_of2 : System.db -> branch -> branch -> (branch * version * version) list
-    = fun t b1 b2 ->
+    = fun db b1 b2 ->
     (* Get other branches *)
     let other_bs = List.filter
                      (fun b' -> b' <> b1 && b' <> b2)
-                     (HeadMap.list_branches t)
+                     (HeadMap.list_branches db)
     in
     (* Get tuples (other_branch, lca_with_from, lca_with_into) *)
     List.fold_right
-      (fun b' ls -> match (get_lca t b1 b',get_lca t b2 b') with
+      (fun b' ls -> match (get_lca db b1 b',get_lca db b2 b') with
                    | (Some lca1, Some lca2) -> (b', lca1, lca2) :: ls
                    | (None,None) -> ls
                    | (Some _,None) ->
@@ -68,64 +69,78 @@ module Make (Data : Content.TYPE) = struct
       []
 
   let commit : System.db -> branch -> Data.o -> unit option
-    = fun t b d ->
-    let@+ old_version = HeadMap.get t b in
+    = fun db b d ->
+    let@+ old_version = HeadMap.get db b in
     let d_t = Data.of_adt d in
-    let hash = put_cs t d_t in
+    let hash = put_cs db d_t in
     let new_version = Version.bump old_version hash in
     let _ = VersionGraph.add_version
-              t new_version [old_version]
+              db new_version [old_version]
     in
-    HeadMap.set t new_version
+    HeadMap.set db new_version
 
   let fork : System.db -> branch -> branch -> branch option
-    = fun t old_branch new_branch ->
-    let@+ old_version = HeadMap.get t old_branch in
+    = fun db old_branch new_branch ->
+    let@+ old_version = HeadMap.get db old_branch in
     let new_version = Version.fork new_branch old_version in
     let _ = VersionGraph.add_version
-              t new_version [old_version] in
-    let _ = set_lca t old_branch new_branch old_version in
+              db new_version [old_version] in
+    (* Setting the read/write consistency to quorum *)
+    let _ = System.set_consistency Scylla.Protocol.Quorom db in
+    let _ = set_lca db old_branch new_branch old_version in
+    (* Resetting read/write consistency to default *)
+    let _ = System.reset_consistency db in
     let _ = Printf.printf "LCAs with: " in
-    let _ = List.iter (fun (b,_) -> Printf.printf "%s, " b) (all_lcas_of t old_branch) in
+    let _ = List.iter (fun (b,_) -> Printf.printf "%s, " b) (all_lcas_of db old_branch) in
     let _ = Printf.printf "\n" in
     let _ = List.iter
-              (fun (b',lca) -> set_lca t b' new_branch lca)
-              (all_lcas_of t old_branch)
+              (fun (b',lca) -> set_lca db b' new_branch lca)
+              (all_lcas_of db old_branch)
     in
-    let _ = HeadMap.set t new_version in
+    (* Setting the read/write consistency to quorum *)
+    let _ = System.set_consistency Scylla.Protocol.Quorom db in
+    let _ = HeadMap.set db new_version in
+    (* Resetting read/write consistency to default *)
+    let _ = System.reset_consistency db in
     new_branch
 
   (** Merge versions by applying the Data.merge function to their
      content. *)
   let merge : System.db -> version -> version -> version -> version
-    = fun t lca_v from_v into_v ->
-    let lca_d = get_cs t (Version.content_id lca_v) |> Option.get in
-    let from_d = get_cs t (Version.content_id from_v) |> Option.get in
-    let into_d = get_cs t (Version.content_id into_v) |> Option.get in
+    = fun db lca_v from_v into_v ->
+    let lca_d = get_cs db (Version.content_id lca_v) |> Option.get in
+    let from_d = get_cs db (Version.content_id from_v) |> Option.get in
+    let into_d = get_cs db (Version.content_id into_v) |> Option.get in
     let new_d = Data.merge lca_d from_d into_d in
-    let new_c = put_cs t new_d in
+    let new_c = put_cs db new_d in
     Version.bump into_v new_c
 
+  (*
+   * The alternative to global locking is to obtain read locks on 2*(n-2)
+   * rows in LcaMap table which requires 2*(n-2) CAS operations to check if
+   * the current values is same as the value that was read at the beginning
+   * of the pull. This would be more expensive than a global lock.
+   *)
   let pull : System.db -> branch -> branch -> (unit, pull_error) result
-    = fun t from_b into_b ->
-    let into_v = HeadMap.get t into_b |> Option.get in
-    let from_v = HeadMap.get t from_b |> Option.get in
-    let lca_o = get_lca t from_b into_b in
-    match lca_o with
-    | None -> Result.Error Unrelated
-    | Some lca_v ->
-       if lca_v = from_v
-       then
-         (* There is nothing to update. *)
-         Ok ()
-       else
-         let other_lcas = all_lcas_of2 t from_b into_b in
+    = fun db from_b into_b ->
+    (* Obtain global lock *)
+    let _ = GlobalLock.try_acquire db into_b in
+    (* Setting the read/write consistency to quorum *)
+    let _ = System.set_consistency Scylla.Protocol.Quorom db in
+    let into_v = HeadMap.get db into_b |> Option.get in
+    let from_v = HeadMap.get db from_b |> Option.get in
+    let lca_o = get_lca db from_b into_b in
+    let res = match lca_o with
+      | None -> Result.Error Unrelated
+      | Some lca_v when lca_v = from_v -> Result.Ok () (*Nothing to update*)
+      | Some lca_v -> 
+         let other_lcas = all_lcas_of2 db from_b into_b in
          (* Find any violation of the "no concurrent LCAs for other
             branches" requirement. *)
          let r = List.find_opt
                    (fun (_,from_lca,into_lca) ->
                      VersionGraph.is_concurrent
-                        t from_lca into_lca)
+                        db from_lca into_lca)
                    other_lcas
          in
          match r with
@@ -138,19 +153,19 @@ module Make (Data : Content.TYPE) = struct
 
               then Version.fastfwd from_v into_v
 
-              else merge t lca_v from_v into_v
+              else merge db lca_v from_v into_v
             in
             (* Update head of into_b to the new version. *)
-            let _ = HeadMap.set t new_v in
+            let _ = HeadMap.set db new_v in
             (* Update LCA between from_b and into_b, using from_b's head
                as LCA version. *)
-            let _ = set_lca t from_b into_b from_v in
+            let _ = set_lca db from_b into_b from_v in
             (* Update the other branches' LCAs for into_b. *)
             let _ = List.map
                       (fun (other_b,from_lca,into_lca) ->
                         if VersionGraph.is_ancestor
-                             t into_lca from_lca
-                        then set_lca t into_b other_b from_lca
+                             db into_lca from_lca
+                        then set_lca db into_b other_b from_lca
                         else ())
                       other_lcas
             in
@@ -158,26 +173,31 @@ module Make (Data : Content.TYPE) = struct
             Ok ()
          | Some (b,_,_) ->
             (* Update was blocked due to this other branch. *)
-            Error (Blocked b)
+            Error (Blocked b) in
+    (* Resetting read/write consistency to default *)
+    let _ = System.reset_consistency db in
+    (* Release global lock *)
+    let _ = GlobalLock.release db into_b in
+    res
 
   let read : System.db -> branch -> Data.o option
-    = fun t name ->
-    let@+ v = get_head t name in
-    let d_t = get_cs t (Version.content_id v) |> Option.get in
+    = fun db name ->
+    let@+ v = get_head db name in
+    let d_t = get_cs db (Version.content_id v) |> Option.get in
     Data.to_adt d_t
 
   let new_root : System.db -> branch -> Data.o -> unit
-    = fun t name d ->
+    = fun db name d ->
     let d_t = Data.of_adt d in
-    let hash = put_cs t d_t in
-    set_head t (Version.init name hash)
+    let hash = put_cs db d_t in
+    set_head db (Version.init name hash)
 
-  let debug_dump t =
-    let () = VersionGraph.debug_dump t in
+  let debug_dump db =
+    let () = VersionGraph.debug_dump db in
     let () = Printf.printf "\n" in
-    let () = LcaMap.debug_dump t in
+    let () = LcaMap.debug_dump db in
     let () = Printf.printf "\n" in
     let () = Printf.printf "Branches:\n" in
-    let () = List.iter (fun b -> Printf.printf "%s, " b) (HeadMap.list_branches t) in
+    let () = List.iter (fun b -> Printf.printf "%s, " b) (HeadMap.list_branches db) in
     Printf.printf "\n"
 end
