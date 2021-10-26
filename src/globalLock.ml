@@ -41,7 +41,7 @@ let try_acquire db b =
               ~query:(insert_lock_query db.System.store_name)
               ~values:[|Int (System.global_lock_id); 
                         Varchar (big_of_string b)|] 
-              ~consistency: Scylla.Protocol.Quorom () in
+              ~consistency: Quorom () in
   (*let res = query db.System.connection
             ~query:(update_lock_query db.System.store_name)
             ~values:[| Blob (big_of_string b); 
@@ -51,7 +51,10 @@ let try_acquire db b =
             ~serial_consistency: Scylla.Protocol.Serial () in*)
   begin
     match res with
-    | Ok _ -> Ok ()
+    | Ok {values;_} -> (match values.(0).(0) with 
+                          | Boolean b -> b
+                          | _ -> failwith "Unexpected outcome \
+                                of conditional insert")
     | Error s -> failwith s
   end
 
@@ -61,7 +64,7 @@ let release db b =
   let res = query db.System.connection
               ~query:(delete_lock_query db.System.store_name)
               ~values:[|Int (System.global_lock_id)|] 
-              ~consistency: Scylla.Protocol.Quorom () in
+              ~consistency: Quorom () in
   (*let res = query db.System.connection
             ~query:(update_lock_query db.System.store_name)
             ~values:[| Blob (big_of_string System.global_branch); 
@@ -71,6 +74,6 @@ let release db b =
             ~serial_consistency: Scylla.Protocol.Serial () in*)
   begin
     match res with
-    | Ok _ -> ()
+    | Ok _ -> true
     | Error s -> failwith s
   end
