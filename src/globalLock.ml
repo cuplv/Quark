@@ -32,7 +32,8 @@ let debug_query s = Printf.sprintf
 
 
 let init s conn =
-  let* _ = query conn ~query:(create_lock_table_query s) () in
+  let _ = query conn ~query:(create_lock_table_query s) () 
+          |> Result.get_ok in
   Ok ()
 
 
@@ -40,7 +41,7 @@ let try_acquire db b =
   let res = query db.System.connection
               ~query:(insert_lock_query db.System.store_name)
               ~values:[|Int (System.global_lock_id); 
-                        Varchar (big_of_string b)|] 
+                        Varchar (Util.big_of_string b)|] 
               ~consistency: Quorom () in
   (*let res = query db.System.connection
             ~query:(update_lock_query db.System.store_name)
@@ -59,6 +60,15 @@ let try_acquire db b =
   end
 
 
+let rec acquire ?(interval=0.001) db b = 
+  let$ status = Lwt.return @@ try_acquire db b in
+  match status with
+  | true -> Lwt.return ()
+  | false -> 
+      let$ () = Lwt_unix.sleep interval in
+      let m = 1.0 +. (Random.float 1.0) in 
+      acquire ~interval:(m *. interval) db b
+
 let release db b = 
   let _ = ignore b in
   let res = query db.System.connection
@@ -74,6 +84,6 @@ let release db b =
             ~serial_consistency: Scylla.Protocol.Serial () in*)
   begin
     match res with
-    | Ok _ -> true
+    | Ok _ -> ()
     | Error s -> failwith s
   end

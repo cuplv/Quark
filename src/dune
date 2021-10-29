@@ -1,8 +1,8 @@
 (executable
   (name demo)
-  (libraries irmin scylla)
+  (libraries irmin scylla lwt lwt_ppx lwt.unix)
   (preprocess
-    (pps ppx_irmin)))
+    (pps ppx_irmin lwt_ppx)))
 
 (env
   (dev

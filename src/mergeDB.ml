@@ -123,10 +123,6 @@ module Make (Data : Content.TYPE) = struct
    *)
   let pull : System.db -> branch -> branch -> (unit, pull_error) result
     = fun db from_b into_b ->
-    (* Obtain global lock *)
-    let _ = GlobalLock.try_acquire db into_b in
-    (* Setting the read/write consistency to quorum *)
-    let _ = System.set_consistency Scylla.Protocol.Quorom db in
     let into_v = HeadMap.get db into_b |> Option.get in
     let from_v = HeadMap.get db from_b |> Option.get in
     let lca_o = get_lca db from_b into_b in
@@ -174,11 +170,22 @@ module Make (Data : Content.TYPE) = struct
          | Some (b,_,_) ->
             (* Update was blocked due to this other branch. *)
             Error (Blocked b) in
+    res
+
+
+  let sync db this_b = 
+    let bs = HeadMap.list_branches db in
+    (* Obtain global lock *)
+    let$ () = GlobalLock.acquire db this_b in
+    (* Setting the read/write consistency to quorum *)
+    let _ = System.set_consistency Scylla.Protocol.Quorom db in
+    let _ = List.map (fun other_b -> pull db other_b this_b) bs in
     (* Resetting read/write consistency to default *)
     let _ = System.reset_consistency db in
     (* Release global lock *)
-    let _ = GlobalLock.release db into_b in
-    res
+    let _ = GlobalLock.release db this_b in
+    Lwt.return ()
+
 
   let read : System.db -> branch -> Data.o option
     = fun db name ->

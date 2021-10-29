@@ -16,3 +16,6 @@ type mergefun = string -> string -> string -> (string, string) result
 let (let*) x f = Result.bind x f
 let (let+) x f = Result.map f x
 let (let@+) x f = Option.map f x
+let (let$) = Lwt.bind
+let (and$) = Lwt.both
+
