@@ -1,5 +1,5 @@
-(executable
-  (name demo)
+(executables
+  (names alice bob cheryl)
   (libraries irmin scylla lwt lwt_ppx lwt.unix)
   (preprocess
     (pps ppx_irmin lwt_ppx)))

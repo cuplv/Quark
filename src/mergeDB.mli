@@ -60,7 +60,8 @@ module Make (Data : Content.TYPE) : sig
      reason. *)
   val pull : System.db -> branch -> branch -> (unit, pull_error) result
 
-  val sync : System.db -> branch -> unit Lwt.t
+  val sync : System.db -> branch 
+              -> (branch * (unit, pull_error) result) list Lwt.t
 
   (** Print information from the database tables for debugging. *)
   val debug_dump : System.db -> unit

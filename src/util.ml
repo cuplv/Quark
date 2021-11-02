@@ -19,3 +19,9 @@ let (let@+) x f = Option.map f x
 let (let$) = Lwt.bind
 let (and$) = Lwt.both
 
+let rec loop_until_y (msg:string) : unit Lwt.t = 
+  let$ () = Lwt_io.printf "%s" msg in
+  let$ str = Lwt_io.read_line Lwt_io.stdin in
+  if str="y" then Lwt.return ()
+  else loop_until_y msg
+

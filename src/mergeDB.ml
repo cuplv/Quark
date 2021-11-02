@@ -174,17 +174,18 @@ module Make (Data : Content.TYPE) = struct
 
 
   let sync db this_b = 
-    let bs = HeadMap.list_branches db in
+    let bs = HeadMap.list_branches db |> 
+              List.filter (fun b -> b <> this_b) in
     (* Obtain global lock *)
     let$ () = GlobalLock.acquire db this_b in
     (* Setting the read/write consistency to quorum *)
     let _ = System.set_consistency Scylla.Protocol.Quorom db in
-    let _ = List.map (fun other_b -> pull db other_b this_b) bs in
+    let res = List.map (fun other_b -> pull db other_b this_b) bs in
     (* Resetting read/write consistency to default *)
     let _ = System.reset_consistency db in
     (* Release global lock *)
     let _ = GlobalLock.release db this_b in
-    Lwt.return ()
+    Lwt.return @@ List.combine bs res
 
 
   let read : System.db -> branch -> Data.o option
