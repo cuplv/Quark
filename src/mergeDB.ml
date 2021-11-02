@@ -153,6 +153,12 @@ module Make (Data : Content.TYPE) = struct
             in
             (* Update head of into_b to the new version. *)
             let _ = HeadMap.set db new_v in
+            (* Add new edges to version graph *)
+            let _ = VersionGraph.add_version
+                      db
+                      new_v
+                      [from_v; into_v]
+            in
             (* Update LCA between from_b and into_b, using from_b's head
                as LCA version. *)
             let _ = set_lca db from_b into_b from_v in
