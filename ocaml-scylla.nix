@@ -5,10 +5,10 @@ with ocamlPackages;
 let pname = "scylla";
 
     repo = fetchFromGitHub {
-      owner = "anmolsahoo25";
+      owner = "gowthamk";
       repo = "ocaml-${pname}";
-      rev = "1781f065d913d629052fdf06605de1a727cf5601";
-      sha256 = "05yjhn9hvfjnmkc2m1xb2xch54p8jqy6jyz6qak3rpyrfcdxk778";
+      rev = "65e87bdb61bde19fe2f50f77a6dc88c978445c68";
+      sha256 = "1dn8xdjazkizk8ik8cg5kr6p9jjglw9j2w63iq5p26pkkb5fjfrh";
     };
 
 in

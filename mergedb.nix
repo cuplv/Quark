@@ -11,5 +11,10 @@ buildDunePackage rec {
   version = "0";
   src = ./src;
   useDune2 = true;
-  buildInputs = [ ocaml-scylla ];
+  buildInputs = with ocamlPackages; [
+    ocaml-scylla
+    irmin
+    ppx_irmin
+    lwt_ppx
+  ];
 }
