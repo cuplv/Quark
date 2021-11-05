@@ -30,7 +30,7 @@ module Make (Data : Content.TYPE) : sig
   
   (** [commit h "b" d] commits a new version on branch "b" with
      content d, or returns None if "b" did not exist. *)
-  val commit : System.db -> branch -> Data.o -> unit option
+  val commit : System.db -> branch -> Data.o -> Version.t option
   
   (** [fork h "old" "new"] creates branch "new" as a fork of "old",
      returning Some ("new"). If branch "old" did not exist, None is
@@ -62,6 +62,8 @@ module Make (Data : Content.TYPE) : sig
 
   val sync : System.db -> branch 
               -> (branch * (unit, pull_error) result) list Lwt.t
+
+  val local_sync: System.db -> branch -> Data.o -> Data.o Lwt.t
 
   (** Print information from the database tables for debugging. *)
   val debug_dump : System.db -> unit

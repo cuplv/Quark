@@ -48,4 +48,7 @@ module type TYPE = sig
 
   (** 3-way merge function *)
   val merge: t -> t -> t -> t
+
+  (** 3-way merge function on type o *)
+  val o_merge: o -> o -> o -> o
 end

@@ -41,10 +41,23 @@ module Make(A: Content.ATOM) (S: System.T):
         (*let x_t = A.of_adt x in*)
           Cons (x, hash)
 
+  let time s f v = 
+    let t1 = Sys.time () in
+    let v' = f v in
+    let t2 = Sys.time () in
+    let _ = Printf.printf "%s time: %fs\n" s (t2 -. t1) in
+    let _ = flush stdout in
+    v'
+
+  let of_adt = time "of_adt" of_adt
+  
+  let to_adt = time "to_adt" to_adt
+
   let merge lca_t l1_t l2_t =
     of_adt @@
       OM.merge (to_adt lca_t) (to_adt l1_t) (to_adt l2_t)
 
+  let o_merge = OM.merge
 end
 
 

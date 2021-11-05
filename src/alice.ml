@@ -32,7 +32,7 @@ let new_root b data =
 
 let commit b data =
   match DB.commit db b data with
-  | Some () ->
+  | Some _ ->
      let v = DB.read db b |> Option.get |> to_string in
      let () = Printf.printf "Updated branch %s to value \"%s\".\n%!" b v in
       ()

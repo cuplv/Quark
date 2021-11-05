@@ -17,6 +17,14 @@ module Make (Atom : Content.COMPARABLE) = struct
     | _, [] -> []
     | _, x :: xs -> x :: remove xs (i - 1)
 
+  (* Assumes i≥0 ∧ i<length(l)*)
+  let rec update l i a =
+    match (i, l) with
+    | 0, _ :: xs -> a :: xs
+    | _, [] -> []
+    | _, x :: xs -> x :: update xs (i - 1) a
+
+
   let is_empty = function [] -> true | _ -> false
 
   (*module S = Set.Make(struct

@@ -1,5 +1,6 @@
 (executables
-  (names alice bob cheryl)
+; (names alice bob cheryl)
+  (names monkey)
   (libraries irmin scylla lwt lwt_ppx lwt.unix)
   (preprocess
     (pps ppx_irmin lwt_ppx)))

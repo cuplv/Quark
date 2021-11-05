@@ -68,16 +68,16 @@ module Make (Data : Content.TYPE) = struct
       other_bs
       []
 
-  let commit : System.db -> branch -> Data.o -> unit option
+  let commit : System.db -> branch -> Data.o -> version option
     = fun db b d ->
     let@+ old_version = HeadMap.get db b in
     let d_t = Data.of_adt d in
     let hash = put_cs db d_t in
     let new_version = Version.bump old_version hash in
     let _ = VersionGraph.add_version
-              db new_version [old_version]
-    in
-    HeadMap.set db new_version
+              db new_version [old_version] in
+    let () = HeadMap.set db new_version in
+    new_version
 
   let fork : System.db -> branch -> branch -> branch option
     = fun db old_branch new_branch ->
@@ -193,12 +193,39 @@ module Make (Data : Content.TYPE) = struct
     let _ = GlobalLock.release db this_b in
     Lwt.return @@ List.combine bs res
 
+  (*
+   * This is hack. TODO: fix.
+   *)
+  let (prev_head_op: version option ref) = ref None
 
   let read : System.db -> branch -> Data.o option
     = fun db name ->
     let@+ v = get_head db name in
+    let _ = prev_head_op := Some v in
+    let _ = Printf.printf "prev_head updated\n" in
     let d_t = get_cs db (Version.content_id v) |> Option.get in
     Data.to_adt d_t
+
+  let local_sync db this_b new_d = 
+    let prev_head = match !prev_head_op with 
+        | Some v -> v
+        | None -> failwith "prev_head is None" in
+    let cur_head = get_head db this_b |> Option.get in
+    if prev_head = cur_head then 
+      let _ = Printf.printf "head hasn't moved\n" in
+      let new_v = commit db this_b new_d |> Option.get in
+      let _ = prev_head_op := Some new_v in
+       Lwt.return new_d (* return same data *)
+    else 
+      let _ = Printf.printf "Head moved.\n" in
+      let prev_d = Data.to_adt @@ Option.get @@ get_cs db @@ 
+                      Version.content_id prev_head in
+      let cur_d = Data.to_adt @@ Option.get @@ get_cs db @@ 
+                      Version.content_id cur_head in
+      let merged_d = Data.o_merge prev_d new_d cur_d in
+      let new_v =  commit db this_b merged_d |> Option.get in
+      let _ = prev_head_op := Some new_v in
+      Lwt.return merged_d (* return merged data *)
 
   let new_root : System.db -> branch -> Data.o -> unit
     = fun db name d ->
