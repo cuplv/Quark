@@ -6,7 +6,7 @@ open Printf
 let ip = "127.0.0.1"
 let port = 9042
 let my_branch = "master"
-let doc_file = "plrabn12.txt"
+let doc_file = "hello.txt"
 (*
  * DB for this experiment is made here.
  *)
@@ -15,8 +15,8 @@ let db =
   let () = printf "Opened connection.\n" in
   System.make_db "my_store" conn
   
-module Doc = Mlist.Make(SString)
-module IDoc = Ilist.Make(SString)(struct let db=db end)
+module Doc = SString
+module IDoc = IString
 module DB = MergeDB.Make(IDoc)
 (*************************************************)
 
@@ -24,28 +24,27 @@ let read_doc_file () =
   let fp = try open_in doc_file
            with Sys_error _ -> failwith @@ "Input file "^doc_file
                                 ^" does not exist!" in
-  let doc = ref [] in
-  try
+  let doc = really_input_string fp 1700 in
+  doc
+  (*try
     while true do
       doc := (input_line fp) :: !doc
     done; List.rev !doc
-  with End_of_file -> (close_in fp; List.rev !doc)
+  with End_of_file -> (close_in fp; List.rev !doc)*)
 
 let master_init () = 
   begin
     fail_if_error @@ DB.fresh_init db;
     printf "DB initialized. Tables created.\n";
-    let (data: string list) = read_doc_file () in
+    let (data: Doc.t) = read_doc_file () in
     printf "Doc file read\n";
     DB.new_root db my_branch data;
     printf "Master branch created.\n";
     flush stdout;
   end
 
-let do_an_edit t = 
-  let i = Random.int @@ List.length t in
-  let s' = SString.mutate_random @@ List.nth t i in
-  Doc.update t i s'
+let do_an_edit doc = 
+  SString.mutate_random doc
 
 let comp_time = ref 0.0
 
@@ -81,7 +80,6 @@ let rec sync_loop () : unit Lwt.t =
   let$ sync_res = DB.sync db my_branch in
   let$ () = print_sync_res sync_res >>= fun _ -> 
                 Lwt_io.(flush stdout) in
-  let$ _ = Lwt_unix.sleep 1.0 in
   sync_loop ()
 
 
@@ -93,9 +91,9 @@ let reset () =
 let experiment_f (fp: out_channel) : unit =
   (* Scylla conn established and DB created already. *)
   let () = if my_branch = "master" then master_init () else () in
-  let () = Lwt_main.run (work_loop ())(*@@ Lwt.pick 
+  let () = Lwt_main.run (*work_loop ()*)@@ Lwt.pick 
               [work_loop (); 
-               Lwt_unix.sleep 1.0 >>= fun _ -> sync_loop ()]*) in
+               Lwt_unix.sleep 1.0 >>= fun _ -> sync_loop ()] in
   begin
     let ctime = !comp_time in
     let total_rounds = !_n_rounds in
