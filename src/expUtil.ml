@@ -4,16 +4,17 @@ open MergeDB
 
 let (>>=) = Lwt.bind
 
-let print_sync_res sync_res = 
-  let$ () = Lwt_io.printf "Results of sync:\n" in
-  let str = String.concat "; " @@
-    List.map 
-    (fun (b, res) -> match res with
-      | Ok () -> b^" : ok"
-      | Error (Blocked b') -> b^" : blocked by "^b'
-      | Error Unrelated -> b^" : unrelated")
-    sync_res in
-  Lwt_io.printf "\t%s\n" str
+let print_sync_res = function [] -> Lwt_io.printf "No sync\n"
+  | sync_res ->  
+    let$ () = Lwt_io.printf "Results of sync:\n" in
+    let str = String.concat "; " @@
+      List.map 
+      (fun (b, res) -> match res with
+        | Ok () -> b^" : ok"
+        | Error (Blocked b') -> b^" : blocked by "^b'
+        | Error Unrelated -> b^" : unrelated")
+      sync_res in
+    Lwt_io.printf "\t%s\n" str
 
 let fold f n b = 
   let rec fold_aux f i b = 

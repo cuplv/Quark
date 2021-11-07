@@ -29,6 +29,7 @@ module Make (Data : Content.TYPE) = struct
 
   let fresh_init db =
     let* _ = KeySpace.delete_tag_ks db.connection in
+    let* _ = KeySpace.delete_content_ks db.connection in
     init db
 
   (** Get LCAs for the given branch with other related branches. *)
@@ -79,8 +80,11 @@ module Make (Data : Content.TYPE) = struct
     let () = HeadMap.set db new_version in
     new_version
 
+
   let fork : System.db -> branch -> branch -> branch option
     = fun db old_branch new_branch ->
+    if List.mem new_branch @@ HeadMap.list_branches db
+    then failwith @@ "Branch "^new_branch^" exists!";
     let@+ old_version = HeadMap.get db old_branch in
     let new_version = Version.fork new_branch old_version in
     let _ = VersionGraph.add_version
@@ -180,6 +184,7 @@ module Make (Data : Content.TYPE) = struct
 
 
   let sync db this_b = 
+    let$ _ = Lwt_io.printf "Sync called\n%!" in
     let bs = HeadMap.list_branches db |> 
               List.filter (fun b -> b <> this_b) in
     (* Obtain global lock *)
