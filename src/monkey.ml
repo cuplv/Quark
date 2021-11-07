@@ -1,17 +1,9 @@
 open Util
 open ExpUtil
 open Printf
+open Config
 
 (**************** Initialization ***************)
-let ip = "127.0.0.1"
-let _port = ref 9042
-let _is_master = ref false
-let _branch = 
-  let hname = Unix.gethostname () in
-  let pid = Unix.getpid () in
-  ref @@ sprintf "%s.%d" hname pid
-let _n_rounds = ref 1000
-let doc_file = "hello.txt"
 (*
  * DB for this experiment is made here.
  *)
@@ -31,11 +23,6 @@ let read_doc_file () =
                                 ^" does not exist!" in
   let doc = really_input_string fp 1700 in
   doc
-  (*try
-    while true do
-      doc := (input_line fp) :: !doc
-    done; List.rev !doc
-  with End_of_file -> (close_in fp; List.rev !doc)*)
 
 let master_init () = 
   begin
@@ -55,14 +42,26 @@ let rec child_init ?(n_tries=5) () =
               child_init ~n_tries:(n_tries-1) ())
   | _ -> failwith "Master could not be found!"
 
+let rec wait_for_all () =
+  let brs = List.sort String.compare @@ 
+        HeadMap.list_branches db in
+  if List.length brs < !_n_branches 
+  then
+    (Unix.sleepf 0.2; wait_for_all ())
+  else
+    let my_i = index_of !_branch brs in
+    let (prev_i, next_i) = 
+      ((my_i + !_n_branches -1) mod !_n_branches, 
+       (my_i + 1) mod !_n_branches) in
+    begin
+      _prev_branch := List.nth brs prev_i;
+      _next_branch := List.nth brs next_i;
+      printf "%s --> %s --> %s\n%!" !_prev_branch 
+        !_branch !_next_branch;
+    end
+
 let do_an_edit doc = 
   SString.mutate_random doc
-
-let comp_time = ref 0.0
-
-let sync_time = ref 0.0
-
-let _n_ops_per_round = ref 30
 
 let loop_iter i (pre: Doc.t Lwt.t) : Doc.t Lwt.t = 
   let$ doc = pre in 
@@ -105,6 +104,7 @@ let experiment_f (fp: out_channel) : unit =
   (* Scylla conn established and DB created already. *)
   let () = if !_is_master then master_init () 
            else child_init () in
+  let () = wait_for_all () in
   let () = Lwt_main.run (*work_loop ()*)@@ Lwt.pick 
               [work_loop (); 
                Lwt_unix.sleep 1.0 >>= fun _ -> sync_loop ()] in
@@ -124,7 +124,9 @@ let arg_parse () =
   let anon_fun _ = failwith "Anonymous arguments unexpected" in
   let spec = [("-master", Arg.Set _is_master, "Is this process master?");
               ("--port", Arg.Set_int _port, "Port of Scylla");
-              ("--nrounds", Arg.Set_int _n_rounds, "Number of rounds")] in
+              ("--nrounds", Arg.Set_int _n_rounds, "Number of rounds"); 
+              ("--nbranches", Arg.Set_int _n_branches, "Number of branches"); 
+              ("--branch", Arg.Set_string _branch, "Name of this branch")] in
   begin
     Arg.parse spec anon_fun usage;
     if !_is_master then _branch := "master";

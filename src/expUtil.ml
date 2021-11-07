@@ -26,3 +26,8 @@ let fail_if_error (r: ('a,string) result) : 'a =
   match r with
   | Ok v -> v
   | Error s -> failwith s
+
+let rec index_of a l = match l with
+  | [] -> raise Not_found
+  | x::_ when x=a -> 0
+  | _::xs -> 1 + (index_of a xs)
