@@ -13,6 +13,8 @@ let create_lcastore_query s = Printf.sprintf
      lca_branch blob,
      lca_version_num int,
      lca_content_id blob,
+     lca_vector_clock blob,
+     lca_timestamp blob,
      primary key (
        branch1,
        branch2))"
@@ -24,12 +26,15 @@ let upsert_lca_query s = Printf.sprintf
      branch2,
      lca_branch,
      lca_version_num,
-     lca_content_id)
-   VALUES (?,?,?,?,?)"
+     lca_content_id,
+     lca_vector_clock,
+     lca_timestamp)
+   VALUES (?,?,?,?,?,?,?)"
   s
 
 let get_lca_query s = Printf.sprintf
-  "select lca_branch, lca_version_num, lca_content_id from tag.%s_lca
+  "select lca_branch, lca_version_num, lca_content_id,
+      lca_vector_clock, lca_timestamp from tag.%s_lca
    where branch1 = ? and branch2 = ?"
   s
 

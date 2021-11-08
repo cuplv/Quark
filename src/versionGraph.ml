@@ -10,9 +10,13 @@ let create_graph_query s = Printf.sprintf
      child_branch blob,
      child_version_num int,
      child_content_id blob,
+     child_vector_clock blob,
+     child_timestamp blob,
      parent_branch blob,
      parent_version_num int,
      parent_content_id blob,
+     parent_vector_clock blob,
+     parent_timestamp blob,
      primary key (
        child_branch,
        child_version_num,
@@ -21,7 +25,8 @@ let create_graph_query s = Printf.sprintf
   s
 
 let parents_query s = Printf.sprintf
-  "select parent_branch, parent_version_num, parent_content_id
+  "select parent_branch, parent_version_num, parent_content_id,
+    parent_vector_clock, parent_timestamp
    from tag.%s_version_graph
    where child_branch = ? and child_version_num = ?"
   s
@@ -31,10 +36,14 @@ let add_query s = Printf.sprintf
      child_branch,
      child_version_num,
      child_content_id,
+     child_vector_clock,
+     child_timestamp,
      parent_branch,
      parent_version_num,
-     parent_content_id)
-   VALUES (?,?,?,?,?,?)"
+     parent_content_id,
+     parent_vector_clock,
+     parent_timestamp)
+   VALUES (?,?,?,?,?,?,?,?,?,?)"
   s
 
 let debug_query s = Printf.sprintf
@@ -42,9 +51,13 @@ let debug_query s = Printf.sprintf
      child_branch,
      child_version_num,
      child_content_id,
+     child_vector_clock,
+     child_timestamp,
      parent_branch,
      parent_version_num,
-     parent_content_id
+     parent_content_id,
+     parent_vector_clock,
+     parent_timestamp
    from tag.%s_version_graph"
   s
 
@@ -72,18 +85,21 @@ let rec add_version : System.db -> Version.t -> Version.t list -> unit =
   match parents with
   | [] -> ()
   | p::ps ->
-     let _ = query
-               db.connection
-               ~query:(add_query db.store_name)
-               ~values:(Array.append
-                          (Version.to_row child)
-                          (Version.to_row p))
-               ~consistency: db.consistency
-               ()
-             |> Result.get_ok
-     in
+    let all_vcs = List.map Version.vector_clock (child::parents) in
+    let lub_vc = vc_compute_lub all_vcs in
+    let child = Version.set_vector_clock child lub_vc in
+    let _ = query
+              db.connection
+              ~query:(add_query db.store_name)
+              ~values:(Array.append
+                         (Version.to_row child)
+                         (Version.to_row p))
+              ~consistency: db.consistency
+              ()
+            |> Result.get_ok in
      add_version db child ps
 
+(*
 let rec hunt_for : System.db -> Version.t list -> Version.t -> bool =
   fun db vs v ->
   (* let _ = Printf.printf "Hunt for\n" in
@@ -101,10 +117,12 @@ let rec hunt_for : System.db -> Version.t list -> Version.t -> bool =
               let vs'' = VSet.elements (VSet.of_list vs') in
               (* Continue search breadth-first. *)
               hunt_for db vs'' v
+*)
 
-let is_ancestor db v1 v2 =
-  hunt_for db (parents db v2) v1
+let is_ancestor _ v1 v2 =
+  vc_is_leq (Version.vector_clock v1) (Version.vector_clock v2)
 
+  M
 let is_concurrent db v1 v2 =
   not (v1 = v2 || is_ancestor db v1 v2 || is_ancestor db v2 v1)
 

@@ -15,6 +15,15 @@ val content_id : t -> Hash.t
 (** Get the version_num of a version. *)
 val version_num : t -> int
 
+(** Get the vector clock of a version. *)
+val vector_clock: t -> Util.vector_clock
+
+(** Update vector clock of a version *)
+val set_vector_clock: t -> Util.vector_clock -> t
+
+(** Get the timestamp of a version. *)
+val timestamp: t -> float
+
 (** [init b c] creates a new branch named b with head pointing to a new
  * version with content (hash) as c. *)
 val init : string -> Hash.t -> t
@@ -41,10 +50,6 @@ val of_row : Scylla.Protocol.value array -> t
 
 (** Convert a version into a database row (Blob, Int, Blob). *)
 val to_row : t -> Scylla.Protocol.value array
-
-(** Returns true if the first version is equal to the second or is a
-   later version on the same branch as the second. *)
-val succeeds_or_eq : t -> t -> bool
 
 (** Compare two versions. Needed for Version.t Set.t *)
 val compare : t -> t -> int

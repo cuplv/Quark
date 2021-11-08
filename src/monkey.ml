@@ -43,7 +43,7 @@ let rec child_init ?(n_tries=5) () =
   | _ -> failwith "Master could not be found!"
 
 let rec wait_for_all () =
-  let brs = List.sort String.compare @@ 
+  let brs = List.sort_uniq String.compare @@ 
         HeadMap.list_branches db in
   if List.length brs < !_n_branches 
   then
@@ -54,6 +54,8 @@ let rec wait_for_all () =
       ((my_i + !_n_branches -1) mod !_n_branches, 
        (my_i + 1) mod !_n_branches) in
     begin
+      ignore @@ List.find (fun b' -> b' = !_branch) brs;
+      _branch_list := brs;
       _prev_branch := List.nth brs prev_i;
       _next_branch := List.nth brs next_i;
       printf "%s --> %s --> %s\n%!" !_prev_branch 
@@ -130,6 +132,10 @@ let arg_parse () =
   begin
     Arg.parse spec anon_fun usage;
     if !_is_master then _branch := "master";
+    (*
+     * This makes sure _branch \in _branch_list.
+     *)
+    _branch_list := [!_branch];
     printf "is_master = %B; branch = %s; port=%d; nrounds=%d\n%!" 
               !_is_master !_branch !_port !_n_rounds;
   end

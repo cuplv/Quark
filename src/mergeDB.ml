@@ -37,8 +37,8 @@ module Make (Data : Content.TYPE) = struct
     = fun db b ->
     let other_bs = List.filter
                      (fun b' -> b <> b')
-                     (HeadMap.list_branches db)
-    in
+                     (HeadMap.list_branches db) in
+    let _ = Printf.printf "others: %s\n%!" @@ String.concat "," other_bs in 
     List.fold_right (fun b' ls -> match get_lca db b b' with
                                   | Some lca -> (b',lca) :: ls
                                   | None -> ls)
@@ -80,7 +80,6 @@ module Make (Data : Content.TYPE) = struct
     let () = HeadMap.set db new_version in
     new_version
 
-
   let fork : System.db -> branch -> branch -> branch option
     = fun db old_branch new_branch ->
     if List.mem new_branch @@ HeadMap.list_branches db
@@ -96,7 +95,7 @@ module Make (Data : Content.TYPE) = struct
     let _ = System.reset_consistency db in
     let _ = Printf.printf "LCAs with: " in
     let _ = List.iter (fun (b,_) -> Printf.printf "%s, " b) (all_lcas_of db old_branch) in
-    let _ = Printf.printf "\n" in
+    let _ = Printf.printf "--- \n%!" in
     let _ = List.iter
               (fun (b',lca) -> set_lca db b' new_branch lca)
               (all_lcas_of db old_branch)

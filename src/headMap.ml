@@ -11,6 +11,8 @@ let create_headmap_query s = Printf.sprintf
      branch blob,
      version_num int,
      content_id blob,
+     vector_clock blob,
+     timestamp blob,
      primary key (branch))"
   s
 
@@ -23,12 +25,14 @@ let upsert_head_query s = Printf.sprintf
   "insert into tag.%s_head(
      branch,
      version_num,
-     content_id)
-   VALUES (?,?,?)"
+     content_id,
+     vector_clock,
+     timestamp)
+   VALUES (?,?,?,?,?)"
   s
 
 let get_head_query s = Printf.sprintf
-  "select branch, version_num, content_id
+  "select branch, version_num, content_id, vector_clock, timestamp
    from tag.%s_head
    where branch = ?"
   s
