@@ -25,6 +25,11 @@ let rec loop_until_y (msg:string) : unit Lwt.t =
   if str="y" then Lwt.return ()
   else loop_until_y msg
 
+let range i j = 
+  let rec aux n acc =
+    if n <= i then acc else aux (n-1) (n :: acc) in 
+  aux j []
+
 type vector_clock = (string*int) list
 
 let vc_from_string (s:string) : (string*int) list = 
@@ -45,6 +50,22 @@ let vc_normal_form vc = List.sort_uniq
 let vc_bottom () = 
   List.map (fun b -> (b,0)) !Config._branch_list
 
+(*
+ * Returns true iff vc1 <= vc2
+ *)
+let vc_is_leq (vc1:vector_clock) (vc2:vector_clock) = 
+  (*
+   * For every (b,n) in vc1 if n >0 then (b,n') has to 
+   * be in vc2, and n'>=n.
+   *)
+  List.for_all 
+    (fun (b,n) -> match n=0, List.assoc_opt b vc2 with 
+      | true, _ -> true (* if vc2.b = 0 then true *)
+      | false, None -> false (* if vc1.b > 0 and b \not\in vc2 then false*)
+      | false , Some n' when n <= n' -> true (* if vc1.b <= vc2.b then true *)
+      | false, Some _ -> false (* if vc2.b > vc1.b then false *)) 
+    vc1
+
 let vc_compute_lub = function
   | [] -> raise (Invalid_argument "LUB requires at least one vc")
   | vcs -> 
@@ -55,13 +76,24 @@ let vc_compute_lub = function
             | None -> (b,n)::vc1
             | Some n' when n'>= n -> vc1
             | Some _ -> (b,n)::(List.remove_assoc b vc1)) vc1 vc2 in
-      vc_normal_form @@ List.fold_left lub (vc_bottom ()) vcs 
+      let ret_vc = vc_normal_form @@ 
+          List.fold_left lub [] vcs in
+      let _ = List.iter (fun vc -> assert (vc_is_leq vc ret_vc)) vcs in
+      ret_vc
 
-let vc_is_leq (vc1:vector_clock) (vc2:vector_clock) = 
-  List.for_all 
-    (fun (b,n) -> match n=0, List.assoc_opt b vc1 with 
-      | true, _ -> true (* if vc2.b = 0 then true *)
-      | false, None -> true (* if vc2.b > 0 and vc1.b = 0 then true*)
-      | _ , Some n' when n' <= n -> true (* if vc1.b <= vc2.b then true *)
-      | _, _ -> false (* else false *)) 
+(*
+ * Computes vc2 - vc1
+ *)
+let vc_diff vc2 vc1 : (string * (int list)) list= 
+  List.map
+    (fun (b,n) -> 
+      let n' = match List.assoc_opt b vc1 with
+                | Some n' -> n' | None -> 0 in
+      let _ = if (n' > n) then
+        begin
+          Printf.printf "VC1: %s\n" @@ vc_to_string vc1;
+          Printf.printf "VC2: %s\n" @@ vc_to_string vc2;
+          assert false;
+        end else () in
+      (b, range n' n))
     vc2

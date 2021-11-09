@@ -116,7 +116,7 @@ module Make (Data : Content.TYPE) = struct
     let into_d = get_cs db (Version.content_id into_v) |> Option.get in
     let new_d = Data.merge lca_d from_d into_d in
     let new_c = put_cs db new_d in
-    Version.bump into_v new_c
+    Version.merge from_v into_v new_c
 
   (*
    * The alternative to global locking is to obtain read locks on 2*(n-2)
@@ -206,7 +206,6 @@ module Make (Data : Content.TYPE) = struct
     = fun db name ->
     let@+ v = get_head db name in
     let _ = prev_head_op := Some v in
-    let _ = Printf.printf "prev_head updated\n" in
     let d_t = get_cs db (Version.content_id v) |> Option.get in
     Data.to_adt d_t
 
@@ -216,12 +215,10 @@ module Make (Data : Content.TYPE) = struct
         | None -> failwith "prev_head is None" in
     let cur_head = get_head db this_b |> Option.get in
     if prev_head = cur_head then 
-      let _ = Printf.printf "head hasn't moved\n" in
       let new_v = commit db this_b new_d |> Option.get in
       let _ = prev_head_op := Some new_v in
        Lwt.return new_d (* return same data *)
     else 
-      let _ = Printf.printf "Head moved.\n" in
       let prev_d = Data.to_adt @@ Option.get @@ get_cs db @@ 
                       Version.content_id prev_head in
       let cur_d = Data.to_adt @@ Option.get @@ get_cs db @@ 

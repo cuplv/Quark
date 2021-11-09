@@ -89,11 +89,11 @@ let work_loop () : unit Lwt.t =
   Lwt.return ()
 
 let rec sync_loop () : unit Lwt.t = 
-  let$ sync_res = DB.sync db !_branch in
-  let$ () = print_sync_res sync_res >>= fun _ -> 
+  let$ _ = DB.sync db !_branch in
+  (*let$ () = print_sync_res sync_res >>= fun _ -> 
                 Lwt_io.(flush stdout) in
   let r = (float @@ (Random.int 5) + 1) *. 0.01 in
-  let$ () = Lwt_unix.sleep r in
+  let$ () = Lwt_unix.sleep r in*)
   sync_loop ()
 
 
@@ -150,7 +150,7 @@ let main () =
               0o777 (!_branch ^ "_results.csv") in
     experiment_f fp;
     close_out fp;
-    DB.debug_dump db;
+    (*DB.debug_dump db;*)
   end;;
 
 main ();;

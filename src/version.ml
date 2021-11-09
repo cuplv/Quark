@@ -53,9 +53,20 @@ let bump : t -> Hash.t -> t =
     timestamp = Unix.gettimeofday ();
   }
 
-let fork new_branch v = init new_branch (content_id v)
+let merge from_v into_v new_c = 
+  let new_v = bump into_v new_c in
+  let lub_vc = vc_compute_lub [new_v.vector_clock; 
+                               from_v.vector_clock] in
+  {new_v with vector_clock = lub_vc}
 
-let fastfwd from_v into_v = bump into_v (content_id from_v)
+let fork new_branch v = 
+  let new_v = init new_branch (content_id v) in 
+  let lub_vc = vc_compute_lub [new_v.vector_clock; 
+                               v.vector_clock] in
+  {new_v with vector_clock = lub_vc}
+
+let fastfwd from_v into_v = 
+  merge from_v into_v from_v.content_id
 
 let of_row : value array -> t =
   fun row ->

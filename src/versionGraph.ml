@@ -85,9 +85,16 @@ let rec add_version : System.db -> Version.t -> Version.t list -> unit =
   match parents with
   | [] -> ()
   | p::ps ->
+    let print_vcs vcs = List.iter 
+        (fun p -> Printf.printf "%s\n" @@ vc_to_string @@
+            Version.vector_clock p) vcs in
     let all_vcs = List.map Version.vector_clock (child::parents) in
     let lub_vc = vc_compute_lub all_vcs in
-    let child = Version.set_vector_clock child lub_vc in
+    let _ = if (Version.vector_clock child = lub_vc) then ()
+            else (print_vcs (child::parents); 
+                  Printf.printf "LUB: (%s)\n" @@ 
+                      vc_to_string lub_vc;
+                  assert false) in
     let _ = query
               db.connection
               ~query:(add_query db.store_name)
@@ -122,7 +129,6 @@ let rec hunt_for : System.db -> Version.t list -> Version.t -> bool =
 let is_ancestor _ v1 v2 =
   vc_is_leq (Version.vector_clock v1) (Version.vector_clock v2)
 
-  M
 let is_concurrent db v1 v2 =
   not (v1 = v2 || is_ancestor db v1 v2 || is_ancestor db v2 v1)
 
@@ -135,12 +141,14 @@ let debug_dump db =
   in
   let () = Printf.printf "Version graph: (child <- parent)\n" in
   Array.iter
-    (fun row -> let c = Version.of_row (Array.sub row 0 3) in
-                let p = Version.of_row (Array.sub row 3 3) in
+    (fun row -> let c = Version.of_row (Array.sub row 0 5) in
+                let p = Version.of_row (Array.sub row 5 5) in
                 Printf.printf
-                  "%s:%d <- %s:%d\n"
+                  "%s:%d:(%s)<- %s:%d:(%s)\n"
                   (Version.branch c)
                   (Version.version_num c)
+                  (vc_to_string @@ Version.vector_clock c)
                   (Version.branch p)
-                  (Version.version_num p))
+                  (Version.version_num p)
+                  (vc_to_string @@ Version.vector_clock p))
     r.values

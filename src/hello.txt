@@ -1,0 +1,25 @@
+Large-scale web services and decentralized applications often rely on
+geo-distributed state replication to meet their latency and availability
+needs. An application's state is replicated asynchronously in such a
+setting, meaning that operations are independently executed at each
+replica, and updates are applied asynchronously at other replicas after a
+possible network delay. Asynchronous execution complicates programming and
+reasoning about distributed applications as it induces the possibility of
+conflicting updates leading to non-convergence and application integrity
+violations. Two basic approaches have been proposed to address this
+problem. The first approach is to selectively strengthen the system
+consistency to pre-empt the conflicting updates. The second is to redefine
+the application state in terms of \emph{Replicated Data Types} (RDTs) that
+are specially engineered to handle conflicting updates. Strengthening
+system consistency necessarily entails inter-replica coordination,
+therefore applications prefer to utilize RDTs as much as possible,
+resorting to consistency strengthening only when it is necessary to maintain
+application integrity. The common design principle guiding the development
+of replicated data types is commutativity. The idea is that if the
+replicated state is only updated by commutative operations, then updates
+can be applied in any order and the replica states are still guaranteed to
+converge. Indeed, there exist common usecases in web applications that can
+be implemented using Commutative Replicated Data Types
+(CRDTs)~\cite{crdts}. For instance, a video view counter on a streaming
+application such as YouTube can be implemented as a Counter CRDT that
+supports commutative increments.

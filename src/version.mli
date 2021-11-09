@@ -32,6 +32,10 @@ val init : string -> Hash.t -> t
    v, using c as the successor's content. *)
 val bump : t -> Hash.t -> t
 
+(** [bump v c] creates a successor version (with same branch name) to
+   v, using c as the successor's content. *)
+val merge: t -> t -> Hash.t -> t
+
 (** [fork new_branch from_v] creates an initial version for
    new_branch which has the same content as from_v. *)
 val fork : string -> t -> t
