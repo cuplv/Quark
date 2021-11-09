@@ -65,26 +65,27 @@ let rec wait_for_all () =
 let do_an_edit doc = 
   SString.mutate_random doc
 
-let loop_iter i (pre: Doc.t Lwt.t) : Doc.t Lwt.t = 
+let loop_iter fp i (pre: Doc.t Lwt.t) : Doc.t Lwt.t = 
   let$ doc = pre in 
-  let t1 = Sys.time() in
+  (*let t1 = Unix.time() in*)
   let doc' = do_an_edit doc in
-  let mdoc_lwt = DB.local_sync db !_branch doc' in
+  let mdoc_lwt = 
+    let t1 = Unix.gettimeofday () in
+    let$ doc = DB.local_sync db !_branch doc' in
+    let t2 = Unix.gettimeofday () in 
+    let _ = comp_time := !comp_time +. (t2 -. t1) in
+    let$ () = Lwt_io.fprintf fp "%fs\n" @@ t2 -. t1 >>= 
+            fun _ -> Lwt_io.flush fp in
+    Lwt.return doc in
   let sleep_lwt = Lwt_unix.sleep 0.5 in
   let$ (mdoc,()) = Lwt.both mdoc_lwt sleep_lwt in
-  let t2 = Sys.time() in
-  let () = comp_time := !comp_time +. (t2 -. t1) in
-  let$ () = if true then 
-              let lat  = !comp_time /. (float @@ i+1) in
-              Lwt_io.printf "Round %d latency: %fs\n" i lat 
-                >>= fun _ -> Lwt_io.(flush stdout)
-            else Lwt.return () in
-  let _ = flush stdout in
+  let$ () = Lwt_io.printf "[%s] Round %d\n" !_branch i 
+                >>= fun _ -> Lwt_io.(flush stdout) in
   Lwt.return mdoc
 
 
-let work_loop () : unit Lwt.t = 
-  let$ _ = ExpUtil.fold (loop_iter) !_n_rounds @@ 
+let work_loop fp : unit Lwt.t = 
+  let$ _ = ExpUtil.fold (loop_iter fp) !_n_rounds @@ 
              Lwt.return @@ Option.get @@ DB.read db !_branch in
   Lwt.return ()
 
@@ -97,27 +98,27 @@ let rec sync_loop () : unit Lwt.t =
   sync_loop ()
 
 
-let reset () =
-  begin 
-    comp_time := 0.0;
-  end
+let experiment_lwt () = 
+  let fname = sprintf "%s_latency_%d.csv" !_branch 
+              (int_of_float @@ Unix.time()) in
+  let _ = printf "Latency results will be written to %s\n" fname in
+  let$ fp = Lwt_io.open_file ~flags:[O_RDWR; O_CREAT]
+              ~mode:Lwt_io.Output fname in
+  let$_ = Lwt.pick [work_loop fp; 
+            (*Lwt_unix.sleep 1.0 >>= fun _ ->*) sync_loop ()] in
+  Lwt_io.close fp
 
-let experiment_f (fp: out_channel) : unit =
+let experiment_f () : unit =
   (* Scylla conn established and DB created already. *)
   let () = if !_is_master then master_init () 
            else child_init () in
   let () = wait_for_all () in
-  let () = Lwt_main.run (*work_loop ()*)@@ Lwt.pick 
-              [work_loop (); 
-               Lwt_unix.sleep 1.0 >>= fun _ -> sync_loop ()] in
+  let () = Lwt_main.run (experiment_lwt ())in
   begin
     let ctime = !comp_time in
     let total_rounds = !_n_rounds in
     let latency = ctime/.(float total_rounds) in
-    fprintf fp "%d,%d,%fs\n" 
-                !_n_rounds !_n_ops_per_round 
-                latency;
-    reset ()
+    printf "[%s] Avg. Latency = %fs\n" !_branch latency
   end
 
 
@@ -144,12 +145,7 @@ let main () =
   begin
     arg_parse ();
     Random.self_init ();
-    (*Logs.set_reporter @@ Logs.format_reporter ();
-    Logs.set_level @@ Some Logs.Error;*)
-    let fp = open_out_gen [Open_append; Open_creat] 
-              0o777 (!_branch ^ "_results.csv") in
-    experiment_f fp;
-    close_out fp;
+    experiment_f ();
     (*DB.debug_dump db;*)
   end;;
 

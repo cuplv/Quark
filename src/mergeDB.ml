@@ -183,7 +183,7 @@ module Make (Data : Content.TYPE) = struct
 
 
   let sync db this_b = 
-    let$ _ = Lwt_io.printf "Sync called\n%!" in
+    (*let$ _ = Lwt_io.printf "Sync called\n%!" in*)
     let bs = HeadMap.list_branches db |> 
               List.filter (fun b -> b <> this_b) in
     (* Obtain global lock *)
