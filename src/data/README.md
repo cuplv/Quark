@@ -390,8 +390,7 @@ sudo ufw allow 22
 (reference)[https://www.scylladb.com/download/?platform=ubuntu-18.04&version=scylla-4.5#open-source]
 
 ```
-wget https://www.scylladb.com/download/?platform=ubuntu-18.04&version=scylla-4.5
-
+# wget https://www.scylladb.com/download/?platform=ubuntu-18.04&version=scylla-4.5
 
 sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 5e08fbd8b5d6ec9c
 
@@ -409,6 +408,7 @@ sudo update-java-alternatives --jre-headless -s java-1.8.0-openjdk-amd64
 
 ### Configure and run scylla
 
+
 ```
 sudo scylla_setup
 sudo systemctl start scylla-server
@@ -421,4 +421,26 @@ cqlsh
 
 # run cassandra stress
 cassandra-stress write -mode cql3 native 
+```
+
+#### What to do if the master-server has started before config
+
+(setup node in cluster)[https://docs.scylladb.com/operating-scylla/procedures/cluster-management/create-cluster/]
+(clear data)[https://docs.scylladb.com/operating-scylla/procedures/cluster-management/clear-data/]
+```
+sudo systemctl stop scylla-server
+
+sudo rm -rf /var/lib/scylla/data
+sudo find /var/lib/scylla/commitlog -type f -delete
+sudo find /var/lib/scylla/hints -type f -delete
+sudo find /var/lib/scylla/view_hints -type f -delete
+```
+
+
+```
+
+sudo systemctl start scylla-server
+
+nodetool status
+
 ```

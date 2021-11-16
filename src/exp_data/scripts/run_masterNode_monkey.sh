@@ -6,6 +6,8 @@ nRounds=$2
 nBranches=$3
 machName=$4
 expName=$5
+numNodes=3
+iters=$(nBranches/numNodes)
 res_path='../../exp_data/'$expName'_'$machName 
 
 echo "$res_path"
@@ -23,7 +25,8 @@ nohup ./monkey.exe -master --port $1 --nrounds $2 --nbranches $3  > master.log &
 sleep 10
 
 # execute slaves
-for i in `seq 2 $nBranches`
+echo "total slaves on node: "$iters
+for i in `seq 2 $iters`
 do
 	branchName=$machName$i
 	echo "executing slave process"

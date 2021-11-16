@@ -9,26 +9,19 @@ opam switch create 4.12.0
 eval $(opam env --switch=4.12.0)
 which ocaml
 
-opam install dune
-
-opam install irmin lwt lwt_ppx ppx_irmin
+opam install dune irmin lwt lwt_ppx ppx_irmin
 opam pin add scylla git+https://git@github.com/gowthamk/ocaml-scylla
 
 
 # Install Scylla
-wget https://www.scylladb.com/download/?platform=ubuntu-18.04&version=scylla-4.5
-
 
 sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 5e08fbd8b5d6ec9c
 
 sudo curl -L --output /etc/apt/sources.list.d/scylla.list http://downloads.scylladb.com/deb/ubuntu/scylla-4.5-$(lsb_release -s -c).list
 
 sudo apt-get update
-sudo apt-get install -y scylla
+sudo apt-get install -y scylla openjdk-8-jre-headless
 
-
-sudo apt-get update
-sudo apt-get install -y openjdk-8-jre-headless
 sudo update-java-alternatives --jre-headless -s java-1.8.0-openjdk-amd64
 
 
