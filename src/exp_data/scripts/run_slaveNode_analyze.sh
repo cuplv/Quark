@@ -1,4 +1,4 @@
-# execute this script from the folder: /src/_build/default/
+# execute this script from the folder: /src/exp_data/scripts/
 # run_master.sh <port> <nrounds> <nbranches> <machName> <expName> 
 port=$1
 nRounds=$2
@@ -9,7 +9,8 @@ numNodes=3
 iters=$(( nBranches/numNodes ))
 
 
-res_path='../../exp_data/'$expName'_'$machName 
+res_path='../'$expName'_'$machName 
+cd $res_path
 
 # execute slaves
 for i in `seq 1 $iters`
@@ -18,9 +19,9 @@ do
 	echo "executing slave process"
 	echo $branchName
     #nohup sh ../../exp_data/scripts/exec_slave.sh $1 $2 $3 $branchName &
-    ./analyze.exe --port $1 --nbranches $3 --branch $branchName 
+    ../../_build/default/analyze.exe --port $1 --nbranches $3 --branch $branchName 
 done
 
-mv ./*.csv $res_path/ 
-mv ./*.log $res_path/
+#mv ./*.csv $res_path/ 
+#mv ./*.log $res_path/
 
