@@ -11,12 +11,6 @@ iters=$(( nBranches/numNodes ))
 
 res_path='../../exp_data/'$expName'_'$machName 
 
-
-
-# execute the master-process
-echo "master: executing analyze"
-./analyze.exe --port $1 --nbranches $3 --branch master
-
 # execute slaves
 for i in `seq 1 $iters`
 do
