@@ -7,6 +7,7 @@ opam first and then use it to install OCaml.
 * Installing opam:
 
 ```
+sudo apt-get install bubblewrap
 bash -c "sh <(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)"
 ```
 
@@ -383,3 +384,41 @@ sudo ufw allow http
 sudo ufw allow 22
 ```
 
+
+## Installing Scylla on Server
+
+(reference)[https://www.scylladb.com/download/?platform=ubuntu-18.04&version=scylla-4.5#open-source]
+
+```
+wget https://www.scylladb.com/download/?platform=ubuntu-18.04&version=scylla-4.5
+
+
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 5e08fbd8b5d6ec9c
+
+sudo curl -L --output /etc/apt/sources.list.d/scylla.list http://downloads.scylladb.com/deb/ubuntu/scylla-4.5-$(lsb_release -s -c).list
+
+sudo apt-get update
+sudo apt-get install -y scylla
+
+
+sudo apt-get update
+sudo apt-get install -y openjdk-8-jre-headless
+sudo update-java-alternatives --jre-headless -s java-1.8.0-openjdk-amd64
+
+```
+
+### Configure and run scylla
+
+```
+sudo scylla_setup
+sudo systemctl start scylla-server
+
+
+nodetool status
+
+
+cqlsh
+
+# run cassandra stress
+cassandra-stress write -mode cql3 native 
+```
