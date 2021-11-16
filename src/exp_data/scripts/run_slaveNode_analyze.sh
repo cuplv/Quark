@@ -18,7 +18,7 @@ echo "master: executing analyze"
 ./analyze.exe --port $1 --nbranches $3 --branch master
 
 # execute slaves
-for i in `seq 2 $iters`
+for i in `seq 1 $iters`
 do
 	branchName=$machName$i
 	echo "executing slave process"
