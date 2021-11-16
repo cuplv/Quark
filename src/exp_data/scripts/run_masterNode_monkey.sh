@@ -7,7 +7,7 @@ nBranches=$3
 machName=$4
 expName=$5
 numNodes=3
-iters=$(nBranches/numNodes)
+iters=$(( nBranches/numNodes ))
 res_path='../../exp_data/'$expName'_'$machName 
 
 echo "$res_path"
