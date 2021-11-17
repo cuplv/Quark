@@ -28,7 +28,7 @@ sudo update-java-alternatives --jre-headless -s java-1.8.0-openjdk-amd64
 # sudo /opt/scylladb/scripts/scylla_dev_mode_setup --developer-mode 1
 
 # It should be manual from here onwards
-#sudo scylla_setup
+#sudo scylla_setup --no-raid-setup --nic eno1 --no-coredump-setup --io-setup 0 --no-rsyslog-setup
 #sudo systemctl start scylla-server
 #nodetool status
 

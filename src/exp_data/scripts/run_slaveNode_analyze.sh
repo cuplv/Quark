@@ -1,5 +1,5 @@
-# execute this script from the folder: /src/exp_data/scripts/
-# run_master.sh <port> <nrounds> <nbranches> <machName> <expName> 
+# execute this script from the folder: /src/_build/default/
+# bash ../../exp_data/scripts/run_master.sh <port> <nrounds> <nbranches> <machName> <expName> 
 port=$1
 nRounds=$2
 nBranches=$3
@@ -9,8 +9,8 @@ numNodes=3
 iters=$(( nBranches/numNodes ))
 
 
-res_path='../'$expName'_'$machName 
-cd $res_path
+res_path='../../exp_data/'$expName'_'$machName 
+
 
 # execute slaves
 for i in `seq 1 $iters`
@@ -24,4 +24,6 @@ done
 
 #mv ./*.csv $res_path/ 
 #mv ./*.log $res_path/
+
+cd ../scripts/
 

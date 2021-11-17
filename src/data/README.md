@@ -175,10 +175,6 @@ conda install gh --channel conda-forge
 
 gh auth login --with-token < mytoken.txt
 
-
-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
-
-
 gh config set git_protocol ssh -h github.com
 ```
 
@@ -442,5 +438,20 @@ sudo find /var/lib/scylla/view_hints -type f -delete
 sudo systemctl start scylla-server
 
 nodetool status
+
+```
+
+### Verify the ports that are being used by scylla-server
+
+```
+sudo lsof -i -P -n |grep LISTEN
+
+```
+Based on this, run your application. 
+
+### Install the experiments
+
+```
+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
 
 ```
