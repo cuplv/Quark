@@ -9,9 +9,6 @@ numNodes=3
 iters=$(( nBranches/numNodes ))
 
 
-res_path='../../exp_data/'$expName'_'$machName 
-
-
 # execute slaves
 for i in `seq 1 $iters`
 do
@@ -21,9 +18,4 @@ do
     #nohup sh ../../exp_data/scripts/exec_slave.sh $1 $2 $3 $branchName &
     ../../_build/default/analyze.exe --port $1 --nbranches $3 --branch $branchName 
 done
-
-#mv ./*.csv $res_path/ 
-#mv ./*.log $res_path/
-
-cd ../scripts/
 

@@ -9,8 +9,7 @@ numNodes=3
 iters=$(( nBranches/numNodes ))
 
 
-res_path='../../exp_data/'$expName'_'$machName 
-#cd $res_path
+res_path='../../exp_data/'$expName
 
 
 echo "moving .csv files into "$res_path

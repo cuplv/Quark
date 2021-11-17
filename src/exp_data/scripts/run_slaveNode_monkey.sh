@@ -8,10 +8,10 @@ machName=$4
 expName=$5
 numNodes=3
 iters=$(( nBranches/numNodes ))
-res_path='../../exp_data/'$expName'_'$machName 
 
-echo "$res_path"
-mkdir $res_path
+#res_path='../../exp_data/'$expName
+#echo "$res_path"
+#mkdir $res_path
 
 # execute slaves
 echo "total slaves on node: "$iters

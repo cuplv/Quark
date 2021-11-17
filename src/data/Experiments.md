@@ -120,6 +120,24 @@ sudo docker exec -it scylla cqlsh
 
 ## Conduct Single Monkey Experiment
 
+Navigate into `src/_build/default` folder
 ```
 
+#On MASTER BRANCH
+
+sudo bash ../../exp_data/scripts/run_masterNode_monkey.sh 9042 500 3 machA [test01]
+
+# On SLAVE BRANCH
+
+sudo bash ../../exp_data/scripts/run_slaveNode_monkey.sh <port-number> 500 3 <mach-Name> [test01]
+
 ```
+
+### Extract staleness values
+
+```
+
+
+```
+
+### Archive the datasets
