@@ -136,8 +136,22 @@ sudo bash ../../exp_data/scripts/run_slaveNode_monkey.sh <port-number> 500 3 <ma
 ### Extract staleness values
 
 ```
+#On MASTER BRANCH
+
+sudo bash ../../exp_data/scripts/run_masterNode_analyze.sh 9042 500 3 machA [test01]
+
+# On SLAVE BRANCH
+
+sudo bash ../../exp_data/scripts/run_slaveNode_analyze.sh <port-number> 500 3 <mach-Name> [test01]
 
 
 ```
 
 ### Archive the datasets
+
+```
+
+sudo bash ../../exp_data/scripts/run_masterNode_cleanupExperiment.sh 9042 500 3 machA [test01]
+
+
+```
