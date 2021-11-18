@@ -11,7 +11,7 @@ iters=$(( nBranches/numNodes ))
 
 # execute the master-process
 echo "master: executing analyze"
-sudo ./analyze.exe --port $1 --nbranches $3 --branch master
+./analyze.exe --port $1 --nbranches $3 --branch master
 
 # execute slaves
 for i in `seq 2 $iters`
@@ -20,6 +20,6 @@ do
 	echo "executing slave process"
 	echo $branchName
     #nohup sh ../../exp_data/scripts/exec_slave.sh $1 $2 $3 $branchName &
-    sudo ./analyze.exe --port $1 --nbranches $3 --branch $branchName 
+    ./analyze.exe --port $1 --nbranches $3 --branch $branchName 
 done
 

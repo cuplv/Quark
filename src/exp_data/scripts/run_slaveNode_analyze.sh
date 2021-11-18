@@ -16,6 +16,6 @@ do
 	echo "executing slave process"
 	echo $branchName
     #nohup sh ../../exp_data/scripts/exec_slave.sh $1 $2 $3 $branchName &
-    sudo ../../_build/default/analyze.exe --port $1 --nbranches $3 --branch $branchName 
+    ../../_build/default/analyze.exe --port $1 --nbranches $3 --branch $branchName 
 done
 

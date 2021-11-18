@@ -21,7 +21,7 @@ do
 	echo "executing slave process"
 	echo $branchName
     #nohup sh ../../exp_data/scripts/exec_slave.sh $1 $2 $3 $branchName &
-    sudo nohup sudo ./monkey.exe --port $1 --nrounds $2 --nbranches $3 --branch $branchName > monkey_$branchName.log &
+    nohup ./monkey.exe --port $1 --nrounds $2 --nbranches $3 --branch $branchName > monkey_$branchName.log &
     sleep 1
 done
 
