@@ -102,10 +102,10 @@ _build/default/monkey.exe -master --port 9042 --nrounds 50 --nbranches 3
 # Wait until you see "master branch created" message, which should
 take no more than 3s. Then run:
 
-_build/default/monkey.exe --port 9042 --nrounds 50 --nbranches 3 --name monkey2
+_build/default/monkey.exe --port 9042 --nrounds 50 --nbranches 3 --branch monkey2
 
 
-_build/default/monkey.exe --port 9042 --nrounds 50 --nbranches 3 --name monkey3
+_build/default/monkey.exe --port 9042 --nrounds 50 --nbranches 3 --branch monkey3
 ```
 
 Monkeys wait for all monkeys to setup their branches before proceeding
@@ -115,13 +115,13 @@ measurement is a post-processing analysis done by `analyze.exe`.
 
 ```
 # Following generates `master_staleness_<timestamp>.csv`
-_build/default/monkey.exe --port 9042 --nbranches 3 --name master
+_build/default/analyze.exe --port 9042 --nbranches 3 --name master
 
 # Following generates `monkey2_staleness_<timestamp>.csv`
-_build/default/monkey.exe --port 9042 --nbranches 3 --name monkey2
+_build/default/analyze.exe --port 9042 --nbranches 3 --name monkey2
 
 # Following generates `monkey3_staleness_<timestamp>.csv`
-_build/default/monkey.exe --port 9042 --nbranches 3 --name monkey3
+_build/default/.analyzeexe --port 9042 --nbranches 3 --name monkey3
 ```
 
 Since we are interested in overall latency and staleness values, you
