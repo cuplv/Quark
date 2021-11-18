@@ -83,7 +83,7 @@ Installing Scylla via Docker
 =============================
 Access the docker-config file in `/merge-experiments/docker/docker-compose.yml`. Use the following command to install the three docker-containers running scylla:
 ```
-docker compose up -d
+docker-compose up -d
 ```
 
 

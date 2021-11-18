@@ -9,31 +9,6 @@ sudo apt-get install build-essential git bubblewrap unzip screen
 ```
 
 
-## Install OPAM/OCAML
-
-```
-bash -c "sh <(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)"
-
-# environment setup
-opam init
-eval $(opam env)
-# install given version of the compiler
-opam switch create 4.12.0
-eval $(opam env)
-# check you got what you want
-which ocaml
-ocaml -version
-
-opam install dune irmin lwt lwt_ppx ppx_irmin
-
-```
-
-## Install SCYLLA OCAML BINDINGS
-
-```
-opam pin add scylla git+https://git@github.com/gowthamk/ocaml-scylla
-
-```
 
 ## Install DOCKER
 
@@ -61,19 +36,6 @@ opam pin add scylla git+https://git@github.com/gowthamk/ocaml-scylla
 ```
 
 
-
-
-## Install REPOSITORY
-
-```
-git clone https://github.com/cuplv/merge-experiments.git
-
-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
-
-dune build
-
-```
-
 ## Install Docker-Compose
 
 (reference)[https://docs.docker.com/compose/install/]
@@ -87,10 +49,74 @@ sudo chmod +x /usr/local/bin/docker-compose
 sudo docker-compose --version
 ```
 
+## Set PERMISSIONS for USER on DOCKER
+```
+sudo usermod -aG docker $USER
+
+
+```
+
+
+## Install OPAM/OCAML
+
+```
+bash -c "sh <(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)"
+
+# environment setup
+opam init
+eval $(opam env)
+# install given version of the compiler
+opam switch create 4.12.0
+eval $(opam env)
+# check you got what you want
+which ocaml
+ocaml -version
+
+opam install dune irmin lwt lwt_ppx ppx_irmin
+
+```
+
+## Install SCYLLA OCAML BINDINGS
+
+```
+opam pin add scylla git+https://git@github.com/gowthamk/ocaml-scylla
+
+```
+
+
+## Install REPOSITORY
+
+```
+git clone https://github.com/cuplv/merge-experiments.git
+
+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
+
+dune build
+
+```
+
+
 
 ## Test execution
 
 ### Startup the ScyllaDB instances
+
+#### Using Docker
+
+```
+sudo docker run --name scylla -d -p 9042:9042  scylladb/scylla
+
+sudo docker run --name scylla2 -d -p 9043:9042 scylladb/scylla --seeds="$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' scylla)"
+
+sudo docker run --name scylla3 -d -p 9044:9042 scylladb/scylla --seeds="$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' scylla)"
+
+sudo docker exec -it scylla nodetool status
+
+sudo docker exec -it scylla cqlsh
+
+```
+
+#### Using Docker-Compose
 ```
 sudo docker-compose up -d
 sudo docker container ls
