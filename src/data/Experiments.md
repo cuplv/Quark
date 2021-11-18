@@ -4,29 +4,10 @@
 ## INSTALL UBUNTU-DEPENDENCIES
 ```
 sudo apt-get update
-sudo apt-get install build-essential git bubblewrap unzip
-
-
-# modify /etc/scylla/scylla.yaml
-
-
-# installed location
-/etc/default/scylla-server
-
+sudo apt-get install build-essential git bubblewrap unzip screen
 
 ```
 
-## CONFIGURE SCYLLA
-```
-
-# setup scylla on the machine and start
-sudo scylla_setup
-
-
-# startup of service
-sudo systemctl start scylla-server
-
-```
 
 ## Install OPAM/OCAML
 
@@ -78,6 +59,9 @@ opam pin add scylla git+https://git@github.com/gowthamk/ocaml-scylla
  $ sudo apt-get install docker-ce docker-ce-cli containerd.io
 
 ```
+
+
+
 
 ## Install REPOSITORY
 
