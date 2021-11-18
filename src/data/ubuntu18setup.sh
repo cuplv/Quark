@@ -1,5 +1,5 @@
 sudo apt-get update
-sudo apt-get install build-essential git bubblewrap unzip screen
+sudo apt-get install build-essential git bubblewrap unzip screen curl
 
 
 bash -c "sh <(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)"
@@ -31,3 +31,9 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io
 sudo curl -L "https://github.com/docker/compose/releases/download/v2.1.1/docker-compose-Linux-x86_64" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 sudo docker-compose --version
+
+
+sudo apt-get update
+sudo apt-get install -y openjdk-8-jre-headless
+sudo update-java-alternatives --jre-headless -s java-1.8.0-openjdk-amd64
+
