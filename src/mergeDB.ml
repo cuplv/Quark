@@ -184,8 +184,10 @@ module Make (Data : Content.TYPE) = struct
 
   let sync db this_b = 
     (*let$ _ = Lwt_io.printf "Sync called\n%!" in*)
-    let bs = HeadMap.list_branches db |> 
-              List.filter (fun b -> b <> this_b) in
+    (* NOTE: not syncing from all the branches. *)
+    (*let bs = HeadMap.list_branches db |> 
+              List.filter (fun b -> b <> this_b) in*)
+    let bs = [!Config._prev_branch] in
     (* Obtain global lock *)
     let$ () = GlobalLock.acquire db this_b in
     (* Setting the read/write consistency to quorum *)
