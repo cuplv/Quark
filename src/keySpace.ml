@@ -4,7 +4,7 @@ let create_tag_ks_query = Printf.sprintf
   "create keyspace if not exists tag
    with replication = {
    'class':'SimpleStrategy',
-   'replication_factor':1};"
+   'replication_factor':3};"
 
 let drop_tag_ks_query = Printf.sprintf
   "drop keyspace if exists tag"
@@ -13,7 +13,7 @@ let create_content_ks_query = Printf.sprintf
   "create keyspace if not exists content
    with replication = {
    'class':'SimpleStrategy',
-   'replication_factor':1};"
+   'replication_factor':3};"
 
 let drop_content_ks_query = Printf.sprintf
   "drop keyspace if exists content"
