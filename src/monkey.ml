@@ -66,17 +66,26 @@ let do_an_edit doc =
   SString.mutate_random doc
 
 let loop_iter fp i (pre: Doc.t Lwt.t) : Doc.t Lwt.t = 
-  let$ doc = pre in 
+  let$ _ = pre in 
   (*let t1 = Unix.time() in*)
-  let doc' = do_an_edit doc in
   let mdoc_lwt = 
     let t1 = Unix.gettimeofday () in
-    let$ doc = DB.local_sync db !_branch doc' in
+    let$ () = GlobalLock.acquire db !_branch in
+    (* Obtain global lock *)
+    let doc = DB.read db !_branch |> Option.get in
+    (* Setting the read/write consistency to quorum *)
+    let _ = System.set_consistency Scylla.Protocol.All db in
+    let doc' = do_an_edit doc in
+    let$ _ = DB.local_sync db !_branch doc' in
+    (* Reset consistency *)
+    let _ = System.reset_consistency db in
+    (* Release global lock *)
+    let _ = GlobalLock.release db !_branch in
     let t2 = Unix.gettimeofday () in 
     let _ = comp_time := !comp_time +. (t2 -. t1) in
     let$ () = Lwt_io.fprintf fp "%fs\n" @@ t2 -. t1 >>= 
             fun _ -> Lwt_io.flush fp in
-    Lwt.return doc in
+    Lwt.return doc' in
   let sleep_lwt = Lwt_unix.sleep 0.5 in
   let$ (mdoc,()) = Lwt.both mdoc_lwt sleep_lwt in
   let$ () = Lwt_io.printf "[%s] Round %d\n" !_branch i 
@@ -104,8 +113,9 @@ let experiment_lwt () =
   let _ = printf "Latency results will be written to %s\n" fname in
   let$ fp = Lwt_io.open_file ~flags:[O_RDWR; O_CREAT]
               ~mode:Lwt_io.Output fname in
-  let$_ = Lwt.pick [work_loop fp; 
-            (*Lwt_unix.sleep 1.0 >>= fun _ ->*) sync_loop ()] in
+  let$ _ = work_loop fp in
+  (*let$_ = Lwt.pick [work_loop fp; 
+            (*Lwt_unix.sleep 1.0 >>= fun _ ->*) sync_loop ()] in*)
   Lwt_io.close fp
 
 let experiment_f () : unit =

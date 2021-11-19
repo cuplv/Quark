@@ -63,6 +63,8 @@ module CAS = struct
         let m = 1.0 +. (Random.float 1.0) in 
         acquire ~interval:(m *. interval) db b
 
+  let acquire db b =  acquire db b
+
   let release db b = 
     let _ = ignore b in
     let res = query db.System.connection
@@ -76,7 +78,9 @@ module CAS = struct
     end
 end
 
+include CAS
 
+(*
 let create_lock_table_query s = Printf.sprintf
   "create table if not exists tag.%s_lock(
      id int,
@@ -144,3 +148,4 @@ let release db b =
     | Ok _ -> ()
     | Error s -> failwith s
   end
+*)

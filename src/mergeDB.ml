@@ -210,23 +210,11 @@ module Make (Data : Content.TYPE) = struct
     Data.to_adt d_t
 
   let local_sync db this_b new_d = 
-    let prev_head = match !prev_head_op with 
-        | Some v -> v
-        | None -> failwith "prev_head is None" in
-    let cur_head = get_head db this_b |> Option.get in
-    if prev_head = cur_head then 
-      let new_v = commit db this_b new_d |> Option.get in
-      let _ = prev_head_op := Some new_v in
-       Lwt.return new_d (* return same data *)
-    else 
-      let prev_d = Data.to_adt @@ Option.get @@ get_cs db @@ 
-                      Version.content_id prev_head in
-      let cur_d = Data.to_adt @@ Option.get @@ get_cs db @@ 
-                      Version.content_id cur_head in
-      let merged_d = Data.o_merge prev_d new_d cur_d in
-      let new_v =  commit db this_b merged_d |> Option.get in
-      let _ = prev_head_op := Some new_v in
-      Lwt.return merged_d (* return merged data *)
+    let bs = HeadMap.list_branches db |> 
+              List.filter (fun b -> b <> this_b) in
+    let _ = List.iter (fun b -> commit db b new_d |> Option.get 
+                                    |> ignore) bs in
+    Lwt.return new_d
 
   let new_root : System.db -> branch -> Data.o -> unit
     = fun db name d ->
