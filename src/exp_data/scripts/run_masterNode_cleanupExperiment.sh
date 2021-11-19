@@ -15,4 +15,5 @@ res_path='../../exp_data/'$expName'-'$machName
 echo "moving .csv files into "$res_path
 sudo mv ./*.csv $res_path/ 
 sudo mv ./*.log $res_path/
+sudo mv ./*.out $res_path/
 
