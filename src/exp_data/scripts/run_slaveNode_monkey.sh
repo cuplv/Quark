@@ -9,7 +9,7 @@ expName=$5
 numNodes=3
 iters=$(( nBranches/numNodes ))
 
-res_path='../../exp_data/'$expName_$machName
+res_path='../../exp_data/'$expName'-'$machName
 echo "$res_path"
 mkdir $res_path
 
