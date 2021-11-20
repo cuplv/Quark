@@ -54,11 +54,13 @@ module CAS = struct
     end
 
 
-  let rec acquire ?(interval=0.001) db b = 
+  let rec acquire ?(interval=1.0) db b = 
     let$ status = Lwt.return @@ try_acquire db b in
     match status with
-    | true -> Lwt.return ()
+    | true -> let$ () = Lwt_io.printf "Acquired\n%!" in
+              Lwt.return ()
     | false -> 
+        let$ () = Lwt_io.printf "Retrying\n%!" in
         let$ () = Lwt_unix.sleep interval in
         let m = 1.0 +. (Random.float 1.0) in 
         acquire ~interval:(m *. interval) db b
