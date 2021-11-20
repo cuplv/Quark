@@ -43,7 +43,7 @@ module CAS = struct
                 ~query:(insert_lock_query db.System.store_name)
                 ~values:[|Int (System.global_lock_id); 
                           Varchar (Util.big_of_string b)|] 
-                ~consistency: Quorom () in
+                ~consistency: One () in
     begin
       match res with
       | Ok {values;_} -> (match values.(0).(0) with 
@@ -54,7 +54,7 @@ module CAS = struct
     end
 
 
-  let rec acquire ?(interval=0.1) db b = 
+  let rec acquire ?(interval=0.05) db b = 
     let$ status = Lwt.return @@ try_acquire db b in
     match status with
     | true -> let$ () = Lwt_io.printf "Acquired\n%!" in
