@@ -54,7 +54,7 @@ module CAS = struct
     end
 
 
-  let rec acquire ?(interval=1.0) db b = 
+  let rec acquire ?(interval=0.1) db b = 
     let$ status = Lwt.return @@ try_acquire db b in
     match status with
     | true -> let$ () = Lwt_io.printf "Acquired\n%!" in
