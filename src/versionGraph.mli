@@ -8,6 +8,9 @@
    existing graph! *)
 val init : string -> Scylla.conn -> (unit, string) result
 
+(** [get_version_by_vc db vc] returns a version with vector_clock=vc.*)
+val get_version_by_vc: System.db -> Util.vector_clock -> Version.t option
+
 (** [add_version h child parents] adds edges to the graph between the child version and each of the listed parent versions. *)
 val add_version : System.db -> Version.t -> Version.t list -> unit
 

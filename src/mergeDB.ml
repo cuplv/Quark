@@ -12,10 +12,20 @@ module Make (Data : Content.TYPE) = struct
 
   let get_head t = HeadMap.get t
   let set_head t = HeadMap.set t
-  let get_lca t = LcaMap.get t
+  (*let get_lca t = LcaMap.get t*)
   let set_lca t = LcaMap.set t
   let get_cs t = CStore.get t
   let put_cs t = CStore.put t
+
+  let get_lca db b1 b2 = 
+    let@* v1 = get_head db b1 in
+    let@* v2 = get_head db b2 in
+    let vc1 = Version.vector_clock v1 in
+    let vc2 = Version.vector_clock v2 in
+    let lca_vc = vc_compute_glb vc1 vc2 in
+    let _ = Printf.printf "vc1 = %s\nvc2 = %s\nlca = %s\n%!" 
+      (vc_to_string vc1) (vc_to_string vc2) (vc_to_string lca_vc) in
+    VersionGraph.get_version_by_vc db lca_vc
 
   let init {store_name=s;connection=conn; _} =
     let* _ = KeySpace.create_tag_ks conn in
@@ -131,54 +141,21 @@ module Make (Data : Content.TYPE) = struct
     let lca_o = get_lca db from_b into_b in
     let res = match lca_o with
       | None -> Result.Error Unrelated
-      | Some lca_v when lca_v = from_v -> Result.Ok () (*Nothing to update*)
+      | Some lca_v when lca_v = from_v -> 
+        begin
+          Printf.printf "Nothing to update\n%!";
+          flush stdout;
+          Result.Ok () (*Nothing to update*)
+        end
       | Some lca_v -> 
-         let other_lcas = all_lcas_of2 db from_b into_b in
-         (* Find any violation of the "no concurrent LCAs for other
-            branches" requirement. *)
-         let r = List.find_opt
-                   (fun (_,from_lca,into_lca) ->
-                     VersionGraph.is_concurrent
-                        db from_lca into_lca)
-                   other_lcas
-         in
-         match r with
-         | None ->
-            (* No violations of the requirement, proceeding with update. *)
-   
-            (* Create new version using either fastfwd or merge. *)
-            let new_v =
-              if lca_v = into_v
-
-              then Version.fastfwd from_v into_v
-
-              else merge db lca_v from_v into_v
-            in
-            (* Update head of into_b to the new version. *)
-            let _ = HeadMap.set db new_v in
-            (* Add new edges to version graph *)
-            let _ = VersionGraph.add_version
-                      db
-                      new_v
-                      [from_v; into_v]
-            in
-            (* Update LCA between from_b and into_b, using from_b's head
-               as LCA version. *)
-            let _ = set_lca db from_b into_b from_v in
-            (* Update the other branches' LCAs for into_b. *)
-            let _ = List.map
-                      (fun (other_b,from_lca,into_lca) ->
-                        if VersionGraph.is_ancestor
-                             db into_lca from_lca
-                        then set_lca db into_b other_b from_lca
-                        else ())
-                      other_lcas
-            in
-            (* Update was successful. *)
-            Ok ()
-         | Some (b,_,_) ->
-            (* Update was blocked due to this other branch. *)
-            Error (Blocked b) in
+        let new_v = if lca_v = into_v 
+                    then Version.fastfwd from_v into_v
+                    else merge db lca_v from_v into_v in
+        (* Update head of into_b to the new version. *)
+        let _ = HeadMap.set db new_v in
+        (* Add new edges to version graph *)
+        let _ = VersionGraph.add_version db new_v [from_v; into_v] in
+        Result.Ok () in
     res
 
 
@@ -187,16 +164,23 @@ module Make (Data : Content.TYPE) = struct
     (* NOTE: not syncing from all the branches. *)
     (*let bs = HeadMap.list_branches db |> 
               List.filter (fun b -> b <> this_b) in*)
+    let t1 = Unix.gettimeofday () in
     let bs = [!Config._prev_branch] in
     (* Obtain global lock *)
     let$ () = GlobalLock.acquire db this_b in
+    let t1' = Unix.gettimeofday () in
     (* Setting the read/write consistency to quorum *)
     let _ = System.set_consistency Scylla.Protocol.Quorom db in
     let res = List.map (fun other_b -> pull db other_b this_b) bs in
     (* Resetting read/write consistency to default *)
     let _ = System.reset_consistency db in
     (* Release global lock *)
+    let t2' = Unix.gettimeofday () in
     let _ = GlobalLock.release db this_b in
+    let t2 = Unix.gettimeofday () in
+    let _ = ignore (t1,t1',t2,t2') in
+    (*let$ _ = Lwt_io.printf "Sync time = %fs. Total time= %fs\n%!"
+        (t2'-.t1')  (t2 -. t1) in*)
     Lwt.return @@ List.combine bs res
 
   (*
@@ -230,11 +214,15 @@ module Make (Data : Content.TYPE) = struct
       let _ = prev_head_op := Some new_v in
       Lwt.return merged_d (* return merged data *)
 
-  let new_root : System.db -> branch -> Data.o -> unit
+  let new_root : System.db -> branch -> Data.o -> Version.t
     = fun db name d ->
     let d_t = Data.of_adt d in
     let hash = put_cs db d_t in
-    set_head db (Version.init name hash)
+    let root = Version.init name hash in
+    begin
+      set_head db root;
+      root
+    end
 
   let debug_dump db =
     let () = VersionGraph.debug_dump db in

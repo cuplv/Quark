@@ -16,6 +16,7 @@ type mergefun = string -> string -> string -> (string, string) result
 let (let*) x f = Result.bind x f
 let (let+) x f = Result.map f x
 let (let@+) x f = Option.map f x
+let (let@*) x f = Option.bind x f
 let (let$) = Lwt.bind
 let (and$) = Lwt.both
 
@@ -80,6 +81,13 @@ let vc_compute_lub = function
           List.fold_left lub [] vcs in
       let _ = List.iter (fun vc -> assert (vc_is_leq vc ret_vc)) vcs in
       ret_vc
+
+let vc_compute_glb vc1 vc2 = 
+  vc_normal_form @@ List.filter_map 
+    (fun (b,n1) -> match List.assoc_opt b vc2 with
+      | None -> None
+      | Some n2 when n2 < n1 -> Some (b,n2)
+      | Some _ -> Some (b,n1)) vc1
 
 (*
  * Computes vc2 - vc1

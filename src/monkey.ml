@@ -30,7 +30,7 @@ let master_init () =
     printf "DB initialized. Tables created.\n";
     let (data: Doc.t) = read_doc_file () in
     printf "Doc file read\n";
-    DB.new_root db !_branch data;
+    System.set_root db (DB.new_root db !_branch data);
     printf "Master branch created.\n";
     flush stdout;
   end
@@ -90,10 +90,10 @@ let work_loop fp : unit Lwt.t =
   Lwt.return ()
 
 let rec sync_loop () : unit Lwt.t = 
-  let$ _ = DB.sync db !_branch in
-  (*let$ () = print_sync_res sync_res >>= fun _ -> 
+  let$ sync_res = DB.sync db !_branch in
+  let$ () = print_sync_res sync_res >>= fun _ -> 
                 Lwt_io.(flush stdout) in
-  let r = (float @@ (Random.int 5) + 1) *. 0.01 in
+  (*let r = (float @@ (Random.int 5) + 1) *. 0.01 in
   let$ () = Lwt_unix.sleep r in*)
   sync_loop ()
 
@@ -147,6 +147,7 @@ let main () =
     Random.self_init ();
     experiment_f ();
     (*DB.debug_dump db;*)
+    VersionGraph.debug_dump db;
   end;;
 
 main ();;

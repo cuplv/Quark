@@ -22,7 +22,7 @@ let get_version db b n =
             ()
           |> Result.get_ok in
   match Array.length r.values with
-  | 0 -> None
+  | 0 -> (printf "(%s,%d) version doesn't exist\n" b n; None)
   | _ -> Some (Version.of_row r.values.(0))
 
 let log_staleness_for db fp pv = 
@@ -31,6 +31,7 @@ let log_staleness_for db fp pv =
   let diffs = List.remove_assoc (Version.branch pv) @@
                 vc_diff (Version.vector_clock v)
                   (Version.vector_clock pv) in
+  let _ = printf "is diffs empty? %B\n" (List.length diffs = 0)  in
   let ts = Version.timestamp v in
   let do_it b' n' = 
     let v' = get_version db b' n' |> Option.get in
