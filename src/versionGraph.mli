@@ -14,9 +14,6 @@ val get_version_by_vc: System.db -> Util.vector_clock -> Version.t option
 (** [add_version h child parents] adds edges to the graph between the child version and each of the listed parent versions. *)
 val add_version : System.db -> Version.t -> Version.t list -> unit
 
-(** Returns a list of parents of the given version. *)
-val parents : System.db -> Version.t -> Version.t list
-
 (** Returns true if the first version is an ancestor of the second. *)
 val is_ancestor : System.db -> Version.t -> Version.t -> bool
 

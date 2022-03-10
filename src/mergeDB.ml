@@ -23,8 +23,8 @@ module Make (Data : Content.TYPE) = struct
     let vc1 = Version.vector_clock v1 in
     let vc2 = Version.vector_clock v2 in
     let lca_vc = vc_compute_glb vc1 vc2 in
-    let _ = Printf.printf "vc1 = %s\nvc2 = %s\nlca = %s\n%!" 
-      (vc_to_string vc1) (vc_to_string vc2) (vc_to_string lca_vc) in
+    (*let _ = Printf.printf "vc1 = %s\nvc2 = %s\nlca = %s\n%!" 
+      (vc_to_string vc1) (vc_to_string vc2) (vc_to_string lca_vc) in*)
     VersionGraph.get_version_by_vc db lca_vc
 
   let init {store_name=s;connection=conn; _} =
@@ -98,11 +98,7 @@ module Make (Data : Content.TYPE) = struct
     let new_version = Version.fork new_branch old_version in
     let _ = VersionGraph.add_version
               db new_version [old_version] in
-    (* Setting the read/write consistency to quorum *)
-    let _ = System.set_consistency Scylla.Protocol.Quorom db in
     let _ = set_lca db old_branch new_branch old_version in
-    (* Resetting read/write consistency to default *)
-    let _ = System.reset_consistency db in
     let _ = Printf.printf "LCAs with: " in
     let _ = List.iter (fun (b,_) -> Printf.printf "%s, " b) (all_lcas_of db old_branch) in
     let _ = Printf.printf "--- \n%!" in
@@ -110,11 +106,7 @@ module Make (Data : Content.TYPE) = struct
               (fun (b',lca) -> set_lca db b' new_branch lca)
               (all_lcas_of db old_branch)
     in
-    (* Setting the read/write consistency to quorum *)
-    let _ = System.set_consistency Scylla.Protocol.Quorom db in
     let _ = HeadMap.set db new_version in
-    (* Resetting read/write consistency to default *)
-    let _ = System.reset_consistency db in
     new_branch
 
   (** Merge versions by applying the Data.merge function to their
@@ -178,7 +170,7 @@ module Make (Data : Content.TYPE) = struct
     let t2' = Unix.gettimeofday () in
     let _ = GlobalLock.release db this_b in
     let t2 = Unix.gettimeofday () in
-    let _ = ignore (t1,t1',t2,t2') in
+    let () = ignore (t1,t1',t2,t2') in
     (*let$ _ = Lwt_io.printf "Sync time = %fs. Total time= %fs\n%!"
         (t2'-.t1')  (t2 -. t1) in*)
     Lwt.return @@ List.combine bs res
@@ -220,6 +212,7 @@ module Make (Data : Content.TYPE) = struct
     let hash = put_cs db d_t in
     let root = Version.init name hash in
     begin
+      VersionGraph.add_version db root [];
       set_head db root;
       root
     end
