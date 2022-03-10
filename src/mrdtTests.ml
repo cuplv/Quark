@@ -36,6 +36,41 @@ let () = assert (not (Set.subset s4 s12))
 let () = assert (Set.mem 7 s4)
 let () = assert (not (Set.mem 7 s12))
 
+(* Tests for the Rbmap impl of red-black tree maps *)
+module Map = Mrbmap.Make(SInt)(SInt)
+
+(* Check equality of all assocs, ignoring structure/balance differences in the tree representation *)
+let (=~) = Map.equal Int.equal
+
+let m0 = Map.empty
+
+let m1 = Map.insert 2 3 m0
+
+let () = assert (Map.find 2 m1 = 3)
+let () = assert (not (Map.mem 3 m1))
+
+let m1' = Map.insert 3 1 (Map.insert 2 4 m0)
+let m2 = Map.insert 7 2 (Map.insert 2 5 m1)
+let m3 = Map.remove 2 m1
+
+let () = assert (Map.merge m0 m1 m1' = m1')
+let () = assert (Map.merge m0 m1' m1 = Map.insert 3 1 m1)
+let () = assert (Map.merge m1 m1 m2 = m2)
+let () = assert (Map.merge m1 m2 m1 = m2)
+let () = assert (Map.merge m1 m2 m3 = Map.remove 2 m2)
+let () = assert (Map.merge m1 m3 m2 = Map.remove 2 m2)
+
+let mi0 = Map.from_list [(6,1);(0,3)]
+let () = assert (mi0 =~ Map.insert 6 1 (Map.insert 0 3 Map.empty))
+
+let mi1 = Map.from_list [(0,5);(1,2);(5,3);(25,4)]
+let mi2 = Map.update (fun _ -> 0) (fun n -> n + 1) mi1
+let () = assert (mi2 =~ Map.from_list [(0,6);(1,3);(5,4);(25,5)])
+let () = assert (Map.lookup 5 mi2 = Some(4))
+let mi3 = Map.modify 5 (fun n -> n + 1) mi2
+let () = assert (mi3 =~ Map.from_list [(0,6);(1,3);(5,5);(25,5)])
+let () = assert (Map.select (fun _ -> 0) mi3 = [6;3;5;5])
+let () = assert (Map.select (Int.compare 1) mi3 = [3])
 
 (* Tests for Mlist *)
 module List = Mlist.Make(SInt)
