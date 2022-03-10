@@ -1,6 +1,6 @@
 (executables
 ; (names alice bob cheryl)
-  (names monkey analyze)
+  (names monkey analyze mrdtTests)
   (libraries irmin scylla lwt lwt_ppx lwt.unix)
   (preprocess
     (pps ppx_irmin lwt_ppx)))
