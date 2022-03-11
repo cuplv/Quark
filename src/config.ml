@@ -17,5 +17,5 @@ let comp_time = ref 0.0
 let sync_time = ref 0.0
 let _n_ops_per_round = ref 30
 let (_branch_list: string list ref) = ref []
-let lock_interval = 0.01
+let lock_interval = 0.001
 

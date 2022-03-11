@@ -76,6 +76,7 @@ let main () =
     let fp = open_out_gen [Open_append; Open_creat] 
               0o777 csv_name in
     analyze_f db fp;
+    flush fp;
     close_out fp;
     printf "Done. Results printed in %s\n" csv_name;
   end;;

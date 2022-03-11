@@ -42,11 +42,11 @@ module Make (Data : Content.TYPE) : sig
   
   (** [new_root h "b" d] creates a new branch "b" not related to any
      other, and gives the new branch an initial version with content
-     d.
+     d. Returns the initial version.
   
      WARNING: if a branch with the name "b" already exists, other
      branches related to the old "b" will become confused. *)
-  val new_root : System.db -> branch -> Data.o -> unit
+  val new_root : System.db -> branch -> Data.o -> Version.t
   
   (** Get the latest value of the branch, or return None if the branch
      does not exist. *)

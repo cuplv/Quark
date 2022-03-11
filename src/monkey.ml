@@ -30,7 +30,7 @@ let master_init () =
     printf "DB initialized. Tables created.\n";
     let (data: Doc.t) = read_doc_file () in
     printf "Doc file read\n";
-    DB.new_root db !_branch data;
+    ignore @@ DB.new_root db !_branch data;
     printf "Master branch created.\n";
     flush stdout;
   end
@@ -74,13 +74,13 @@ let loop_iter fp i (pre: Doc.t Lwt.t) : Doc.t Lwt.t =
     let$ doc = DB.local_sync db !_branch doc' in
     let t2 = Unix.gettimeofday () in 
     let _ = comp_time := !comp_time +. (t2 -. t1) in
-    let$ () = Lwt_io.fprintf fp "%fs\n" @@ t2 -. t1 >>= 
-            fun _ -> Lwt_io.flush fp in
+    let$ () = Lwt_io.fprintf fp "%fs\n" @@ t2 -. t1 
+          (*>>= fun _ -> Lwt_io.flush fp*) in
     Lwt.return doc in
   let sleep_lwt = Lwt_unix.sleep 0.5 in
   let$ (mdoc,()) = Lwt.both mdoc_lwt sleep_lwt in
   let$ () = Lwt_io.printf "[%s] Round %d\n" !_branch i 
-                >>= fun _ -> Lwt_io.(flush stdout) in
+                (*>>= fun _ -> Lwt_io.(flush stdout)*) in
   Lwt.return mdoc
 
 

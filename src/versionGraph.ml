@@ -24,6 +24,23 @@ let create_graph_query s = Printf.sprintf
        parent_version_num))"
   s
 
+let create_map_query s = Printf.sprintf
+  "create table if not exists tag.%s_version_map(
+     branch blob,
+     version_num int,
+     content_id blob,
+     vector_clock blob,
+     timestamp blob,
+     primary key (vector_clock))"
+  s
+
+let get_version_by_vc_query s = Printf.sprintf
+  "select branch, version_num, content_id,
+    vector_clock, timestamp
+    from tag.%s_version_map
+    where vector_clock = ?"
+  s
+
 let parents_query s = Printf.sprintf
   "select parent_branch, parent_version_num, parent_content_id,
     parent_vector_clock, parent_timestamp
@@ -31,7 +48,17 @@ let parents_query s = Printf.sprintf
    where child_branch = ? and child_version_num = ?"
   s
 
-let add_query s = Printf.sprintf
+let add_vertex_query s = Printf.sprintf
+  "insert into tag.%s_version_map(
+     branch,
+     version_num,
+     content_id,
+     vector_clock,
+     timestamp)
+   VALUES (?,?,?,?,?)"
+  s
+
+let add_edge_query s = Printf.sprintf
   "insert into tag.%s_version_graph(
      child_branch,
      child_version_num,
@@ -65,26 +92,32 @@ let debug_query s = Printf.sprintf
 let init : string -> Scylla.conn -> (unit, string) result =
   fun s conn ->
   let* _ = query conn ~query:(create_graph_query s) () in
+  let* _ = query conn ~query:(create_map_query s) () in
   Ok ()
 
-let parents : System.db -> Version.t -> Version.t list =
-  fun db v ->
-  let r = query
-            db.connection
-            ~query:(parents_query db.store_name)
-            ~values:(Array.sub (Version.to_row v) 0 2)
-            ~consistency: db.consistency
-            ()
-          |> Result.get_ok
-  in
-  let f row ls = Version.of_row row :: ls in
-  Array.fold_right f r.values []
+let get_version_by_vc (db:System.db) (vc:vector_clock) 
+    : Version.t option = 
+  match vc with
+  | [] -> failwith "Empty vector clock!"
+  (*| [("master",1)] -> db.System.root
+  | [(_,_)] -> failwith "Unexpected in get_version_by_vc"*)
+  | _ -> 
+    begin
+      let vc_str = vc_to_string @@ vc_normal_form vc in
+      let r = query
+                db.connection
+                ~query:(get_version_by_vc_query db.store_name)
+                ~values:[| Blob (big_of_string vc_str) |]
+                ~consistency: db.consistency
+                ()
+              |> Result.get_ok in
+      match Array.length r.values with
+      | 0 -> (Printf.printf "No version %s\n" vc_str; None)
+      | _ -> Some (Version.of_row r.values.(0))
+    end
 
-let rec add_version : System.db -> Version.t -> Version.t list -> unit =
+let add_version : System.db -> Version.t -> Version.t list -> unit =
   fun db child parents ->
-  match parents with
-  | [] -> ()
-  | p::ps ->
     let print_vcs vcs = List.iter 
         (fun p -> Printf.printf "%s\n" @@ vc_to_string @@
             Version.vector_clock p) vcs in
@@ -95,36 +128,25 @@ let rec add_version : System.db -> Version.t -> Version.t list -> unit =
                   Printf.printf "LUB: (%s)\n" @@ 
                       vc_to_string lub_vc;
                   assert false) in
-    let _ = query
-              db.connection
-              ~query:(add_query db.store_name)
-              ~values:(Array.append
-                         (Version.to_row child)
-                         (Version.to_row p))
-              ~consistency: db.consistency
-              ()
-            |> Result.get_ok in
-     add_version db child ps
-
-(*
-let rec hunt_for : System.db -> Version.t list -> Version.t -> bool =
-  fun db vs v ->
-  (* let _ = Printf.printf "Hunt for\n" in
-   * let _ = List.iter (fun v -> Printf.printf "%s:%d " v.branch v.version_num) vs in
-   * let _ = Printf.printf "\n" in *)
-  match vs with
-  | [] -> false
-  | _ -> if List.exists (Version.succeeds_or_eq v) vs
-         then true
-         else let vs' = List.concat_map
-                          (fun c -> parents db c)
-                          vs
-              in
-              (* Remove duplicates. *)
-              let vs'' = VSet.elements (VSet.of_list vs') in
-              (* Continue search breadth-first. *)
-              hunt_for db vs'' v
-*)
+    begin
+      query
+        db.connection
+        ~query:(add_vertex_query db.store_name)
+        ~values:(Version.to_row child)
+        ~consistency: db.consistency
+        () |> Result.get_ok |> ignore;
+      List.iter 
+        (fun p ->
+          query
+            db.connection
+            ~query:(add_edge_query db.store_name)
+            ~values:(Array.append
+                       (Version.to_row child)
+                       (Version.to_row p))
+            ~consistency: db.consistency
+            () |> Result.get_ok |> ignore) 
+        parents;
+    end
 
 let is_ancestor _ v1 v2 =
   vc_is_leq (Version.vector_clock v1) (Version.vector_clock v2)
@@ -139,7 +161,7 @@ let debug_dump db =
             ()
           |> Result.get_ok
   in
-  let () = Printf.printf "Version graph: (child <- parent)\n" in
+  let () = Printf.printf "Version graph: (child <- parent)\n%!" in
   Array.iter
     (fun row -> let c = Version.of_row (Array.sub row 0 5) in
                 let p = Version.of_row (Array.sub row 5 5) in
