@@ -99,5 +99,9 @@ let () = assert (List.merge l1 l3 l2 = [8;4;5;6])
 
 (* Tests for TPCC *)
 
-let i1 = Mtpcc.Id.random
-let () = assert (i1 >= 0L && i1 <= 10000000000L)
+let i1 = Mtpcc.Id.random 10
+let () = assert (i1 >= 0L && i1 <= 10L)
+
+let (_,tm1) = TpccSetup.load_item 3 Mtpcc.Db.empty
+
+let _ = Mtpcc.Select1.item_table (Int64.of_int 3) tm1

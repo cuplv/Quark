@@ -10,7 +10,7 @@ module Id = struct
 
   let of_int = Int64.of_int
 
-  let random = Random.int64 10000000000L
+  let random n = Random.int64 (Int64.of_int n)
 end
 
 type id = Id.t
@@ -324,6 +324,18 @@ type db =
 module Db = struct
   type t = db
   let t = db_t
+
+  let empty =
+    { warehouse_table = WarehouseTable.empty;
+      district_table = DistrictTable.empty;
+      order_table = OrderTable.empty;
+      neworder_table = NewOrderTable.empty;
+      orderline_table = OrderLineTable.empty;
+      item_table = ItemTable.empty;
+      hist_table = HistTable.empty;
+      stock_table = StockTable.empty;
+      customer_table = CustomerTable.empty;
+    }
 
   let merge lca v1 v2 =
     { warehouse_table = WarehouseTable.merge
