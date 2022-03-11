@@ -68,6 +68,9 @@ let mi2 = Map.update (fun _ -> 0) (fun n -> n + 1) mi1
 let () = assert (mi2 =~ Map.from_list [(0,6);(1,3);(5,4);(25,5)])
 let () = assert (Map.lookup 5 mi2 = Some(4))
 let mi3 = Map.modify 5 (fun n -> n + 1) mi2
+let () = assert (mi3 =~ Map.merge mi2 mi3 mi2)
+let mi4 = Map.modify 5 (fun n -> n - 2) mi3
+let () = assert (mi4 =~ Map.modify 5 (fun n -> n - 1) mi2)
 let () = assert (mi3 =~ Map.from_list [(0,6);(1,3);(5,5);(25,5)])
 let () = assert (Map.select (fun _ -> 0) mi3 = [6;3;5;5])
 let () = assert (Map.select (Int.compare 1) mi3 = [3])
@@ -93,3 +96,8 @@ let l3 = List.insert (List.insert l1 1 6) 0 8
 
 let () = assert (List.merge l1 l2 l3 = [8;4;5;6])
 let () = assert (List.merge l1 l3 l2 = [8;4;5;6])
+
+(* Tests for TPCC *)
+
+let i1 = Mtpcc.Id.random
+let () = assert (i1 >= 0L && i1 <= 10000000000L)
