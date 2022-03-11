@@ -1,4 +1,4 @@
-module Make(Key : Content.ATOM)(Value: Content.TYPE)(S: System.T):
+module Make(Key : Content.ATOM)(Value: Content.TYPE):
   Content.TYPE with type o = Mrbmap.Make(Key)(Value).t = struct
 
   module Map = Mrbmap.Make(Key)(Value)

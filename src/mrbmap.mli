@@ -41,6 +41,8 @@ module Make (Key : Content.ATOM)(Value : Content.TYPE) : sig
 
   val keys : t -> Key.t list
 
+  val choose: t -> Key.t
+
   (** [merge lca v1 v2] performs three-way merge on [v1] and [v2],
      using [lca] as the common ancestor **)
   val merge : t -> t -> t -> t

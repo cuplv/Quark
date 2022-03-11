@@ -317,6 +317,32 @@ module Make (Key : Content.ATOM)(Value : Content.TYPE) = struct
       when sigf k = 0 -> (select sigf l)@(v::(select sigf r))
     | _ -> failwith "Rbmap.select.exhaustiveness"
 
+  let rec height_est = function
+    | Empty -> 0
+    | Black (l,_,r) | Red (l,_,r) -> 
+      if Random.int 2 = 0 then 1 + height_est l 
+      else 1+ height_est r
+
+  let choose t = 
+    let rec choose_aux h rand t = match t with
+      | Empty -> raise Not_found
+      | Black (Empty,(k,_), Empty) 
+      | Red (Empty, (k,_), Empty) -> k
+      | Black (lt, (k,_), rt) 
+      | Red (lt, (k,_), rt) ->
+        if rand < (1 lsl (h+1))  then k
+        else begin 
+          let child = match lt,rt with
+            | Empty,_ -> rt
+            | _,Empty -> lt
+            | _,_ -> if Random.int 2 = 0 then lt else rt in
+          choose_aux (h+1) rand child
+        end in
+    let eht = height_est t in
+    let esize = 1 lsl (min eht 30) in
+    let rand = (Random.int esize) + 1 in
+    choose_aux 0 rand t
+
   let merge lca v1 v2 =
     let ks = List.sort_uniq (Key.compare) (keys v1 @ keys v2) in
     let f t k = match (lookup k lca, lookup k v1, lookup k v2) with

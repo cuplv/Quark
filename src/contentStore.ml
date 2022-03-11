@@ -73,6 +73,7 @@ module Make (Stored : Content.SERIALIZABLE) = struct
       let json_str = get_string v.values.(0).(0) in
       match of_json_string json_str with
         | Ok v -> Some v
-        | Error (`Msg s) -> failwith @@ s
+        | Error (`Msg s) -> (Printf.printf "Json parsing failed!\n%!";
+                            failwith @@ s)
     else (Printf.printf "got none\n"; None)
 end
