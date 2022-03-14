@@ -1,6 +1,8 @@
 module Make (Key : Content.ATOM)(Value : Content.TYPE) : sig
-  type t
-  val t : t Irmin.Type.t
+  type t =
+    | Black of t * (Key.t * Value.t) * t
+    | Red of t * (Key.t * Value.t) * t
+    | Empty
 
   (** The empty map *)
   val empty : t

@@ -12,7 +12,7 @@ let db =
   System.make_db "my_store" conn
   
 module Map = Mrbmap.Make(SInt)(SInt)
-module IMap = Irbmap.Make(SInt)(SInt)
+module IMap = Irbmap.Make(SInt)(SInt)(struct let db = db end)
 module DB = MergeDB.Make(IMap)
 (*************************************************)
 
@@ -40,7 +40,7 @@ let do_an_oper t =
     do_a_delete t
 
 let mk_init_map () = 
-  ExpUtil.fold (fun _ t -> do_an_insert t) 200 Map.empty
+  ExpUtil.fold (fun _ t -> do_an_insert t) 500 Map.empty
 
 (******)
 

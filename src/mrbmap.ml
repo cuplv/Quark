@@ -29,7 +29,7 @@ module Make (Key : Content.ATOM)(Value : Content.TYPE) = struct
     | Black of t * (Key.t * Value.t) * t
     | Red of t * (Key.t * Value.t) * t
     | Empty
-  [@@deriving irmin]
+  (*[@@deriving irmin]*)
 
   type enum =
     | End

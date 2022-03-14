@@ -98,6 +98,7 @@ let () = assert (List.merge l1 l2 l3 = [8;4;5;6])
 let () = assert (List.merge l1 l3 l2 = [8;4;5;6])
 
 (* Tests for TPCC *)
-
+(*
 let i1 = Mtpcc.Id.random
 let () = assert (i1 >= 0L && i1 <= 10000000000L)
+*)
