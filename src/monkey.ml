@@ -74,7 +74,7 @@ let loop_iter fp i (pre: Doc.t Lwt.t) : Doc.t Lwt.t =
     (* Obtain global lock *)
     let doc = DB.read db !_branch |> Option.get in
     (* Setting the read/write consistency to quorum *)
-    let _ = System.set_consistency Scylla.Protocol.All db in
+    let _ = System.set_consistency Scylla.Protocol.Quorom db in
     let doc' = do_an_edit doc in
     let$ _ = DB.local_sync db !_branch doc' in
     (* Reset consistency *)

@@ -82,7 +82,6 @@ end
 
 include CAS
 
-(*
 let create_lock_table_query s = Printf.sprintf
   "create table if not exists tag.%s_lock(
      id int,
@@ -115,7 +114,7 @@ let try_acquire db b =
   let res = query db.System.connection
               ~query:(read_lock_query db.System.store_name)
               ~values:[|Int (System.global_lock_id)|] 
-              ~consistency: Quorom () in
+              ~consistency: One () in
   begin
     match res with
     | Ok {values;_} -> (match values.(0).(0) with 
@@ -144,10 +143,9 @@ let release db b =
               ~query:(insert_lock_query db.System.store_name)
               ~values:[|Int (System.global_lock_id); 
                         Varchar (Util.big_of_string next_b)|] 
-              ~consistency:Quorom () in
+              ~consistency:One () in
   begin
     match res with
     | Ok _ -> ()
     | Error s -> failwith s
   end
-*)
