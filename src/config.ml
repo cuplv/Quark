@@ -9,7 +9,7 @@ let _branch =
   let pid = Unix.getpid () in
   ref @@ Printf.sprintf "%s.%d" hname pid
 let _n_rounds = ref 1000
-let doc_file = "hello.txt"
+let doc_file = "plrabn.txt"
 let _n_branches = ref 1
 let _prev_branch = ref ""
 let _next_branch = ref ""
